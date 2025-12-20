@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Image - Bridge Defect Detection{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="text-center mb-4">
+            <h1><i class="bi bi-bridge"></i> Steel Bridge Defect Detection</h1>
+            <p class="lead text-muted">Upload an image to detect cracks and corrosion</p>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-cloud-upload"></i> Upload Image
+                </h5>
+                
+                <!-- Model Selection -->
+                <div class="mb-3">
+                    <label class="form-label">Select Model</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="model" id="modelV8" value="v8" checked>
+                        <label class="btn btn-outline-primary" for="modelV8">
+                            <i class="bi bi-cpu"></i> YOLOv8
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="model" id="modelV11" value="v11">
+                        <label class="btn btn-outline-primary" for="modelV11">
+                            <i class="bi bi-cpu-fill"></i> YOLOv11
+                        </label>
+                    </div>
+                </div>
+
+                <!-- File Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <i class="bi bi-cloud-arrow-up upload-icon"></i>
+                    <p class="mb-2">Drag & drop image here or click to browse</p>
+                    <p class="text-muted small">Supported formats: JPG, JPEG, PNG (Max 16MB)</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress mt-3" id="progressBar" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 100%">Processing...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="card shadow-sm" id="resultsCard" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="bi bi-check-circle text-success"></i> Detection Results
+                </h5>
+
+                <!-- Stats Row -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-primary">
+                                <i class="bi bi-search"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Total Defects</div>
+                                <div class="stat-value" id="totalDefects">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-warning">
+                                <i class="bi bi-lightning"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Cracks</div>
+                                <div class="stat-value" id="totalCracks">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-danger">
+                                <i class="bi bi-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Corrosion</div>
+                                <div class="stat-value" id="totalCorrosion">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-info">
+                                <i class="bi bi-stopwatch"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Time (ms)</div>
+                                <div class="stat-value" id="inferenceTime">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Comparison -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Original Image</h6>
+                        <img id="originalImage" class="img-fluid rounded" alt="Original">
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Detection Result</h6>
+                        <img id="resultImage" class="img-fluid rounded" alt="Result">
+                    </div>
+                </div>
+
+                <!-- Detections Table -->
+                <div class="mb-3">
+                    <h6 class="text-muted mb-2">Detected Defects</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Type</th>
+                                    <th>Confidence</th>
+                                    <th>Bounding Box</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detectionsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> Detect Another
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="downloadResult()">
+                        <i class="bi bi-download"></i> Download Result
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const progressBar = document.getElementById('progressBar');
+    const resultsCard = document.getElementById('resultsCard');
+    let currentResultImage = '';
+
+    // Click to upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFile(files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    function handleFile(file) {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file');
+            return;
+        }
+
+        // Validate file size (16MB)
+        if (file.size > 16 * 1024 * 1024) {
+            alert('File size exceeds 16MB limit');
+            return;
+        }
+
+        uploadFile(file);
+    }
+
+    function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Get selected model
+        const model = document.querySelector('input[name="model"]:checked').value;
+        formData.append('model', model);
+
+        // Show progress
+        progressBar.style.display = 'block';
+        resultsCard.style.display = 'none';
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            progressBar.style.display = 'none';
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+
+            displayResults(data);
+        })
+        .catch(error => {
+            progressBar.style.display = 'none';
+            alert('Upload failed: ' + error);
+        });
+    }
+
+    function displayResults(data) {
+        // Update stats
+        document.getElementById('totalDefects').textContent = data.total;
+        document.getElementById('totalCracks').textContent = data.counts.crack;
+        document.getElementById('totalCorrosion').textContent = data.counts.corrosion;
+        document.getElementById('inferenceTime').textContent = data.inference_time;
+
+        // Update images
+        document.getElementById('originalImage').src = data.original_image;
+        document.getElementById('resultImage').src = data.result_image;
+        currentResultImage = data.result_image;
+
+        // Update detections table
+        const tableBody = document.getElementById('detectionsTable');
+        tableBody.innerHTML = '';
+        
+        data.detections.forEach((det, idx) => {
+            const row = `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>
+                        <span class="badge ${det.class === 'crack' ? 'bg-warning' : 'bg-danger'}">
+                            ${det.class.toUpperCase()}
+                        </span>
+                    </td>
+                    <td>${det.confidence}%</td>
+                    <td class="small text-muted">
+                        [${det.bbox.map(v => v.toFixed(0)).join(', ')}]
+                    </td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+
+        // Show results
+        resultsCard.style.display = 'block';
+        resultsCard.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function downloadResult() {
+        if (currentResultImage) {
+            const link = document.createElement('a');
+            link.href = currentResultImage;
+            link.download = 'detection_result.jpg';
+            link.click();
+        }
+    }
+</script>
+{% endblock %}

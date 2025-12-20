@@ -1,0 +1,67 @@
+[
+  {
+    "timestamp": "2025-12-20T11:08:59.961154",
+    "filename": "corrosion_Corrosion.v1i_0155_jpg.rf.b7933e03e010e646b5ad3752166efcdf.jpg",
+    "model": "V8",
+    "total_detections": 5,
+    "counts": {
+      "corrosion": 5,
+      "crack": 0
+    },
+    "inference_time": 139.67,
+    "original_image": "/static/uploads/20251220_110859_corrosion_Corrosion.v1i_0155_jpg.rf.b7933e03e010e646b5ad3752166efcdf.jpg",
+    "result_image": "/static/results/result_20251220_110859_corrosion_Corrosion.v1i_0155_jpg.rf.b7933e03e010e646b5ad3752166efcdf.jpg"
+  },
+  {
+    "timestamp": "2025-12-20T11:11:32.750634",
+    "filename": "steel_corrosion.jpg",
+    "model": "V8",
+    "total_detections": 2,
+    "counts": {
+      "corrosion": 2,
+      "crack": 0
+    },
+    "inference_time": 288.08,
+    "original_image": "/static/uploads/20251220_111130_steel_corrosion.jpg",
+    "result_image": "/static/results/result_20251220_111130_steel_corrosion.jpg"
+  },
+  {
+    "timestamp": "2025-12-20T11:12:26.176409",
+    "filename": "steel_bridge.jpg",
+    "model": "V8",
+    "total_detections": 1,
+    "counts": {
+      "corrosion": 1,
+      "crack": 0
+    },
+    "inference_time": 1449.18,
+    "original_image": "/static/uploads/20251220_111224_steel_bridge.jpg",
+    "result_image": "/static/results/result_20251220_111224_steel_bridge.jpg"
+  },
+  {
+    "timestamp": "2025-12-20T11:18:03.550932",
+    "filename": "steel_bridge1.jpg",
+    "model": "V8",
+    "total_detections": 0,
+    "counts": {
+      "crack": 0,
+      "corrosion": 0
+    },
+    "inference_time": 155.0,
+    "original_image": "/static/uploads/20251220_111803_steel_bridge1.jpg",
+    "result_image": "/static/results/result_20251220_111803_steel_bridge1.jpg"
+  },
+  {
+    "timestamp": "2025-12-20T11:18:11.902152",
+    "filename": "steel_bridge2.jpg",
+    "model": "V8",
+    "total_detections": 0,
+    "counts": {
+      "crack": 0,
+      "corrosion": 0
+    },
+    "inference_time": 112.78,
+    "original_image": "/static/uploads/20251220_111811_steel_bridge2.jpg",
+    "result_image": "/static/results/result_20251220_111811_steel_bridge2.jpg"
+  }
+]

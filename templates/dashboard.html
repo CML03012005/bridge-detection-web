@@ -1,0 +1,355 @@
+{# VSCode: This is a Jinja2 template #}
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Bridge Defect Detection{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-speedometer2"></i> Monitoring Dashboard</h1>
+            <button class="btn btn-outline-danger btn-sm" onclick="clearHistory()">
+                <i class="bi bi-trash"></i> Clear History
+            </button>
+        </div>
+
+        <!-- Overview Stats -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-primary">
+                                <i class="bi bi-file-earmark-image"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Total Inspections</div>
+                                <div class="stat-value">{{ stats.total_inspections }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-info">
+                                <i class="bi bi-search"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Total Detections</div>
+                                <div class="stat-value">{{ stats.total_detections }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-warning">
+                                <i class="bi bi-lightning"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Cracks Found</div>
+                                <div class="stat-value">{{ stats.total_cracks }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-danger">
+                                <i class="bi bi-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Corrosion Found</div>
+                                <div class="stat-value">{{ stats.total_corrosion }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-pie-chart"></i> Defect Type Distribution</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="defectPieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Defect Comparison</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="defectBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-graph-up"></i> Detection Timeline</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Inspections Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-clock-history"></i> Recent Inspections</h6>
+                    </div>
+                    <div class="card-body">
+                        {% if stats.recent_inspections %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Time</th>
+                                        <th>Filename</th>
+                                        <th>Model</th>
+                                        <th>Total Defects</th>
+                                        <th>Cracks</th>
+                                        <th>Corrosion</th>
+                                        <th>Inference (ms)</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for inspection in stats.recent_inspections %}
+                                    <tr>
+                                        <td class="small">
+                                            {{ inspection.timestamp[:19].replace('T', ' ') }}
+                                        </td>
+                                        <td>
+                                            <span class="text-truncate d-inline-block" style="max-width: 150px;" 
+                                                  title="{{ inspection.filename }}">
+                                                {{ inspection.filename }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">{{ inspection.model }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ inspection.total_detections }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning text-dark">{{ inspection.counts.crack }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ inspection.counts.corrosion }}</span>
+                                        </td>
+                                        <td>{{ inspection.inference_time }}</td>
+                                        <td>
+                                            <a href="{{ inspection.result_image }}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               target="_blank">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                            <p class="mt-3">No inspections yet. <a href="/">Upload an image</a> to get started!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+    // Store data in immediately invoked function to avoid global scope conflicts
+    (function() {
+        // Data from Flask backend
+        const data = {
+            history: {{ history | tojson | safe }},
+            cracks: {{ stats.total_cracks }},
+            corrosion: {{ stats.total_corrosion }}
+        };
+
+        // Pie Chart - Defect Type Distribution
+        const pieCtx = document.getElementById('defectPieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Cracks', 'Corrosion'],
+                datasets: [{
+                    data: [data.cracks, data.corrosion],
+                    backgroundColor: ['#ffc107', '#dc3545'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = data.cracks + data.corrosion;
+                                const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Bar Chart - Defect Comparison
+        const barCtx = document.getElementById('defectBarChart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Cracks', 'Corrosion'],
+                datasets: [{
+                    label: 'Total Detections',
+                    data: [data.cracks, data.corrosion],
+                    backgroundColor: ['#ffc107', '#dc3545'],
+                    borderColor: ['#e0a800', '#bd2130'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Timeline Chart - Detection Timeline
+        const last20 = data.history.slice(-20);
+        const timelineLabels = last20.map(function(h) {
+            const date = new Date(h.timestamp);
+            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        });
+        
+        const timelineData = last20.map(function(h) {
+            return h.total_detections;
+        });
+
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: timelineLabels,
+                datasets: [{
+                    label: 'Detections per Inspection',
+                    data: timelineData,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    })();
+
+    // Clear history function (global scope for onclick)
+    function clearHistory() {
+        if (confirm('Are you sure you want to clear all inspection history?')) {
+            fetch('/clear-history', {
+                method: 'POST'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Failed to clear history: ' + data.error);
+                }
+            })
+            .catch(function(error) {
+                alert('Error: ' + error);
+            });
+        }
+    }
+</script>
+{% endblock %}
