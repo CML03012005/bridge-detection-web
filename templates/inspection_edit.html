@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Inspection #{{ inspection.id }} - Bridge Defect Detection{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('inspections_list') }}">Inspections</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('inspection_detail', inspection_id=inspection.id) }}">Inspection #{{ inspection.id }}</a></li>
+                <li class="breadcrumb-item active">Edit</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h1><i class="bi bi-pencil-square"></i> Edit Inspection #{{ inspection.id }}</h1>
+    </div>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('inspection_edit', inspection_id=inspection.id) }}">
+                    
+                    <!-- Bridge Information Section -->
+                    <h5 class="card-title mb-3 text-primary">
+                        <i class="bi bi-bridge"></i> Bridge Information
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="bridge_name" class="form-label">Bridge Name</label>
+                            <input type="text" class="form-control" id="bridge_name" name="bridge_name" 
+                                   value="{{ inspection.bridge_name or '' }}" 
+                                   placeholder="e.g., San Juanico Bridge">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="bridge_location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="bridge_location" name="bridge_location" 
+                                   value="{{ inspection.location or '' }}" 
+                                   placeholder="e.g., Leyte-Samar">
+                        </div>
+                    </div>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="bridge_type" class="form-label">Bridge Type</label>
+                            <select class="form-select" id="bridge_type" name="bridge_type">
+                                <option value="Steel Bridge" {% if inspection.bridge_type == 'Steel Bridge' %}selected{% endif %}>Steel Bridge</option>
+                                <option value="Concrete Bridge" {% if inspection.bridge_type == 'Concrete Bridge' %}selected{% endif %}>Concrete Bridge</option>
+                                <option value="Suspension Bridge" {% if inspection.bridge_type == 'Suspension Bridge' %}selected{% endif %}>Suspension Bridge</option>
+                                <option value="Cable-Stayed Bridge" {% if inspection.bridge_type == 'Cable-Stayed Bridge' %}selected{% endif %}>Cable-Stayed Bridge</option>
+                                <option value="Truss Bridge" {% if inspection.bridge_type == 'Truss Bridge' %}selected{% endif %}>Truss Bridge</option>
+                                <option value="Arch Bridge" {% if inspection.bridge_type == 'Arch Bridge' %}selected{% endif %}>Arch Bridge</option>
+                                <option value="Beam Bridge" {% if inspection.bridge_type == 'Beam Bridge' %}selected{% endif %}>Beam Bridge</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Inspection Details Section -->
+                    <h5 class="card-title mb-3 text-success">
+                        <i class="bi bi-person-check"></i> Inspection Details
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="inspector_name" class="form-label">Inspector Name</label>
+                            <input type="text" class="form-control" id="inspector_name" name="inspector_name" 
+                                   value="{{ inspection.inspector_name or '' }}" 
+                                   placeholder="e.g., Juan Dela Cruz">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="weather_condition" class="form-label">Weather Condition</label>
+                            <select class="form-select" id="weather_condition" name="weather_condition">
+                                <option value="">Select weather...</option>
+                                <option value="Sunny" {% if inspection.weather_condition == 'Sunny' %}selected{% endif %}>Sunny</option>
+                                <option value="Cloudy" {% if inspection.weather_condition == 'Cloudy' %}selected{% endif %}>Cloudy</option>
+                                <option value="Rainy" {% if inspection.weather_condition == 'Rainy' %}selected{% endif %}>Rainy</option>
+                                <option value="Overcast" {% if inspection.weather_condition == 'Overcast' %}selected{% endif %}>Overcast</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="temperature" class="form-label">Temperature (°C)</label>
+                            <input type="number" step="0.1" class="form-control" id="temperature" name="temperature" 
+                                   value="{{ inspection.temperature or '' }}" 
+                                   placeholder="e.g., 28.5">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="severity_rating" class="form-label">Severity Rating (DPWH Standard)</label>
+                            <select class="form-select" id="severity_rating" name="severity_rating" required>
+                                <option value="Good" {% if inspection.severity_rating == 'Good' %}selected{% endif %}>
+                                    Good (0-5% reduction)
+                                </option>
+                                <option value="Fair" {% if inspection.severity_rating == 'Fair' %}selected{% endif %}>
+                                    Fair (5-20% reduction)
+                                </option>
+                                <option value="Poor" {% if inspection.severity_rating == 'Poor' %}selected{% endif %}>
+                                    Poor (20-30% reduction)
+                                </option>
+                                <option value="Bad" {% if inspection.severity_rating == 'Bad' %}selected{% endif %}>
+                                    Bad (>30% reduction)
+                                </option>
+                            </select>
+                            <div class="form-text">
+                                Based on DPWH Bridge Repair Manual damage rating
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label for="inspection_notes" class="form-label">Inspection Notes</label>
+                        <textarea class="form-control" id="inspection_notes" name="inspection_notes" 
+                                  rows="4" placeholder="Enter any observations, remarks, or recommendations...">{{ inspection.inspection_notes or '' }}</textarea>
+                    </div>
+
+                    <hr>
+
+                    <!-- Detection Summary (Read-only) -->
+                    <h5 class="card-title mb-3 text-info">
+                        <i class="bi bi-bar-chart"></i> Detection Summary
+                    </h5>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Total Detections</label>
+                            <input type="text" class="form-control" value="{{ inspection.total_detections }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Cracks</label>
+                            <input type="text" class="form-control" value="{{ inspection.crack_count }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Corrosion</label>
+                            <input type="text" class="form-control" value="{{ inspection.corrosion_count }}" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('inspection_detail', inspection_id=inspection.id) }}" 
+                           class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Sidebar: Preview -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Basic Info</h6>
+            </div>
+            <div class="card-body small">
+                <p><strong>ID:</strong> #{{ inspection.id }}</p>
+                <p><strong>Timestamp:</strong><br>
+                   {{ inspection.timestamp.strftime('%Y-%m-%d %H:%M') if inspection.timestamp else 'N/A' }}</p>
+                <p><strong>Model:</strong> {{ inspection.model }}</p>
+                <p><strong>Filename:</strong><br>{{ inspection.filename }}</p>
+                <p class="mb-0"><strong>Inference Time:</strong> {{ inspection.inference_time }} ms</p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-image"></i> Result Preview</h6>
+            </div>
+            <div class="card-body">
+                <img src="{{ inspection.result_image_path }}" 
+                     class="img-fluid rounded" 
+                     alt="Detection result">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

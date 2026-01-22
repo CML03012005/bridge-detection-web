@@ -63,5 +63,18 @@
     "inference_time": 112.78,
     "original_image": "/static/uploads/20251220_111811_steel_bridge2.jpg",
     "result_image": "/static/results/result_20251220_111811_steel_bridge2.jpg"
+  },
+  {
+    "timestamp": "2026-01-14T11:19:29.785390",
+    "filename": "corrosion.jpg",
+    "model": "V8",
+    "total_detections": 1,
+    "counts": {
+      "corrosion": 1,
+      "crack": 0
+    },
+    "inference_time": 1367.89,
+    "original_image": "/static/uploads/20260114_111926_corrosion.jpg",
+    "result_image": "/static/results/result_20260114_111926_corrosion.jpg"
   }
 ]

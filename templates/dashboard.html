@@ -18,14 +18,19 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1><i class="bi bi-speedometer2"></i> Monitoring Dashboard</h1>
-            <button class="btn btn-outline-danger btn-sm" onclick="clearHistory()">
-                <i class="bi bi-trash"></i> Clear History
-            </button>
+            <div>
+                <a href="{{ url_for('inspections_list') }}" class="btn btn-primary btn-sm me-2">
+                    <i class="bi bi-list-check"></i> View All Inspections
+                </a>
+                <button class="btn btn-outline-danger btn-sm" onclick="clearHistory()">
+                    <i class="bi bi-trash"></i> Clear History
+                </button>
+            </div>
         </div>
 
         <!-- Overview Stats -->
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -40,7 +45,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -55,22 +60,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="card-body">
-                        <div class="stat-box">
-                            <div class="stat-icon bg-warning">
-                                <i class="bi bi-lightning"></i>
-                            </div>
-                            <div class="stat-content">
-                                <div class="stat-label">Cracks Found</div>
-                                <div class="stat-value">{{ stats.total_cracks }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -92,31 +82,16 @@
             <div class="col-md-6">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
-                        <h6 class="mb-0"><i class="bi bi-pie-chart"></i> Defect Type Distribution</h6>
+                        <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Corrosion Detection Trend</h6>
                     </div>
                     <div class="card-body">
                         <div class="chart-container">
-                            <canvas id="defectPieChart"></canvas>
+                            <canvas id="corrosionBarChart"></canvas>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Defect Comparison</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="defectBarChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-3 mb-4">
-            <div class="col-12">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
                         <h6 class="mb-0"><i class="bi bi-graph-up"></i> Detection Timeline</h6>
@@ -147,7 +122,6 @@
                                         <th>Filename</th>
                                         <th>Model</th>
                                         <th>Total Defects</th>
-                                        <th>Cracks</th>
                                         <th>Corrosion</th>
                                         <th>Inference (ms)</th>
                                         <th>Action</th>
@@ -157,7 +131,15 @@
                                     {% for inspection in stats.recent_inspections %}
                                     <tr>
                                         <td class="small">
-                                            {{ inspection.timestamp[:19].replace('T', ' ') }}
+                                            {% if inspection.timestamp %}
+                                                {% if inspection.timestamp is string %}
+                                                    {{ inspection.timestamp[:19].replace('T', ' ') }}
+                                                {% else %}
+                                                    {{ inspection.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                                {% endif %}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
                                         </td>
                                         <td>
                                             <span class="text-truncate d-inline-block" style="max-width: 150px;" 
@@ -172,18 +154,23 @@
                                             <span class="badge bg-primary">{{ inspection.total_detections }}</span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-warning text-dark">{{ inspection.counts.crack }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ inspection.counts.corrosion }}</span>
+                                            <span class="badge bg-danger">{{ inspection.corrosion_count }}</span>
                                         </td>
                                         <td>{{ inspection.inference_time }}</td>
                                         <td>
-                                            <a href="{{ inspection.result_image }}" 
-                                               class="btn btn-sm btn-outline-primary" 
-                                               target="_blank">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('inspection_detail', inspection_id=inspection.id) }}" 
+                                                class="btn btn-outline-primary" 
+                                                title="View Details">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{{ inspection.result_image_path }}" 
+                                                class="btn btn-outline-secondary" 
+                                                target="_blank"
+                                                title="View Image">
+                                                    <i class="bi bi-image"></i>
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -214,54 +201,20 @@
         // Data from Flask backend
         const data = {
             history: {{ history | tojson | safe }},
-            cracks: {{ stats.total_cracks }},
-            corrosion: {{ stats.total_corrosion }}
+            corrosion: {{ stats.total_corrosion or 0 }}
         };
 
-        // Pie Chart - Defect Type Distribution
-        const pieCtx = document.getElementById('defectPieChart').getContext('2d');
-        new Chart(pieCtx, {
-            type: 'pie',
-            data: {
-                labels: ['Cracks', 'Corrosion'],
-                datasets: [{
-                    data: [data.cracks, data.corrosion],
-                    backgroundColor: ['#ffc107', '#dc3545'],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const total = data.cracks + data.corrosion;
-                                const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Bar Chart - Defect Comparison
-        const barCtx = document.getElementById('defectBarChart').getContext('2d');
+        // Bar Chart - Corrosion Detection Trend
+        const barCtx = document.getElementById('corrosionBarChart').getContext('2d');
         new Chart(barCtx, {
             type: 'bar',
             data: {
-                labels: ['Cracks', 'Corrosion'],
+                labels: ['Total Corrosion Detected'],
                 datasets: [{
-                    label: 'Total Detections',
-                    data: [data.cracks, data.corrosion],
-                    backgroundColor: ['#ffc107', '#dc3545'],
-                    borderColor: ['#e0a800', '#bd2130'],
+                    label: 'Corrosion Count',
+                    data: [data.corrosion],
+                    backgroundColor: ['#dc3545'],
+                    borderColor: ['#bd2130'],
                     borderWidth: 1
                 }]
             },
@@ -287,12 +240,18 @@
         // Timeline Chart - Detection Timeline
         const last20 = data.history.slice(-20);
         const timelineLabels = last20.map(function(h) {
-            const date = new Date(h.timestamp);
-            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            let timestamp = h.timestamp;
+            if (typeof timestamp === 'string') {
+                timestamp = timestamp.replace('T', ' ').substring(0, 16);
+                return timestamp.substring(11); // Show only time
+            } else {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            }
         });
         
         const timelineData = last20.map(function(h) {
-            return h.total_detections;
+            return h.total_detections || 0;
         });
 
         const timelineCtx = document.getElementById('timelineChart').getContext('2d');
@@ -303,8 +262,8 @@
                 datasets: [{
                     label: 'Detections per Inspection',
                     data: timelineData,
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderColor: '#dc3545',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
                     borderWidth: 2,
                     fill: true,
                     tension: 0.4
@@ -323,7 +282,8 @@
                 },
                 plugins: {
                     legend: {
-                        display: false
+                        display: true,
+                        position: 'bottom'
                     }
                 }
             }
