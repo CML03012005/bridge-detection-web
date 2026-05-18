@@ -19,3 +19,7 @@ FLASK_CONFIG = {
     'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,  # 16MB max file size
     'ALLOWED_EXTENSIONS': {'png', 'jpg', 'jpeg'}
 }
+
+# Inference Configuration — must match RPi5 corrosion_detection.py
+CONFIDENCE_THRESHOLD = 0.05
+IOU_THRESHOLD = 0.45

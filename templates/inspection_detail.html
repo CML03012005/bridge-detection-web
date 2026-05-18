@@ -178,25 +178,59 @@
                 <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Detection Statistics</h5>
             </div>
             <div class="card-body">
-                <div class="row g-3">
+                <div class="row g-3 mb-3">
                     <div class="col-4">
                         <div class="text-center">
-                            <div class="display-4 text-primary">{{ inspection.total_detections }}</div>
-                            <small class="text-muted">Total Defects</small>
+                            <div class="display-4 text-danger">{{ inspection.rust_count }}</div>
+                            <small class="text-muted">Rust Detections</small>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="text-center">
-                            <div class="display-4 text-warning">{{ inspection.crack_count }}</div>
-                            <small class="text-muted">Cracks</small>
+                            <div class="display-4 text-primary">{{ inspection.patch_count or 0 }}</div>
+                            <small class="text-muted">Patches</small>
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="text-center">
-                            <div class="display-4 text-danger">{{ inspection.corrosion_count }}</div>
-                            <small class="text-muted">Corrosion</small>
+                            <div class="display-4 text-warning">{{ inspection.coverage_ratio or 0 }}%</div>
+                            <small class="text-muted">Coverage</small>
                         </div>
                     </div>
+                </div>
+                <hr>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <small class="text-muted">Severity Level</small><br>
+                        {% if inspection.severity_level == 'EXTENSIVE' %}
+                            <span class="badge bg-danger fs-6">EXTENSIVE</span>
+                        {% elif inspection.severity_level == 'DISTRIBUTED' %}
+                            <span class="badge bg-warning text-dark fs-6">DISTRIBUTED</span>
+                        {% elif inspection.severity_level == 'LOCALIZED' %}
+                            <span class="badge bg-success fs-6">LOCALIZED</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6">NONE</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Upload Source</small><br>
+                        {% if inspection.upload_source == 'rpi5' %}
+                            <span class="badge bg-primary fs-6">RPi5 Field Scan</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6">Web Upload</span>
+                        {% endif %}
+                    </div>
+                    {% if inspection.blur_score is not none %}
+                    <div class="col-6 mt-2">
+                        <small class="text-muted">Blur Score</small><br>
+                        <span class="{{ 'text-danger' if inspection.blur_score < 100 else 'text-success' }}">
+                            {{ inspection.blur_score | round(1) }}
+                            {% if inspection.blur_score < 100 %}
+                                <i class="bi bi-exclamation-triangle" title="Image may be blurry"></i>
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -250,11 +284,7 @@
                             <tr>
                                 <td>{{ loop.index }}</td>
                                 <td>
-                                    {% if det.defect_type == 'crack' %}
-                                        <span class="badge bg-warning text-dark">Crack</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Corrosion</span>
-                                    {% endif %}
+                                    <span class="badge bg-danger">{{ det.defect_type | upper }}</span>
                                 </td>
                                 <td>{{ det.confidence }}%</td>
                                 <td class="small">

@@ -6,8 +6,8 @@
 <div class="row">
     <div class="col-lg-8 mx-auto">
         <div class="text-center mb-4">
-            <h1><i class="bi bi-bridge"></i> Steel Bridge Defect Detection</h1>
-            <p class="lead text-muted">Upload an image to detect cracks and corrosion</p>
+            <h1><i class="bi bi-bridge"></i> Steel Bridge Corrosion Detection</h1>
+            <p class="lead text-muted">Upload a bridge image to detect and analyze rust on steel components</p>
         </div>
 
         <!-- Upload Card -->
@@ -17,22 +17,6 @@
                     <i class="bi bi-cloud-upload"></i> Upload Image
                 </h5>
                 
-                <!-- Model Selection -->
-                <div class="mb-3">
-                    <label class="form-label">Select Model</label>
-                    <div class="btn-group w-100" role="group">
-                        <input type="radio" class="btn-check" name="model" id="modelV8" value="v8" checked>
-                        <label class="btn btn-outline-primary" for="modelV8">
-                            <i class="bi bi-cpu"></i> YOLOv8
-                        </label>
-                        
-                        <input type="radio" class="btn-check" name="model" id="modelV11" value="v11">
-                        <label class="btn btn-outline-primary" for="modelV11">
-                            <i class="bi bi-cpu-fill"></i> YOLOv11
-                        </label>
-                    </div>
-                </div>
-
                 <!-- File Upload Area -->
                 <div class="upload-area" id="uploadArea">
                     <i class="bi bi-cloud-arrow-up upload-icon"></i>
@@ -58,40 +42,51 @@
 
                 <!-- Stats Row -->
                 <div class="row g-3 mb-4">
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="stat-box">
                             <div class="stat-icon bg-primary">
                                 <i class="bi bi-search"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Total Defects</div>
+                                <div class="stat-label">Detections</div>
                                 <div class="stat-value" id="totalDefects">0</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="stat-box">
                             <div class="stat-icon bg-warning">
-                                <i class="bi bi-lightning"></i>
+                                <i class="bi bi-exclamation-circle"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Cracks</div>
-                                <div class="stat-value" id="totalCracks">0</div>
+                                <div class="stat-label">Severity</div>
+                                <div class="stat-value" id="severityLevel">—</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="stat-box">
                             <div class="stat-icon bg-danger">
-                                <i class="bi bi-exclamation-triangle"></i>
+                                <i class="bi bi-grid-3x3"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Corrosion</div>
-                                <div class="stat-value" id="totalCorrosion">0</div>
+                                <div class="stat-label">Coverage</div>
+                                <div class="stat-value" id="coverageRatio">0%</div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-success">
+                                <i class="bi bi-diagram-3"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Patches</div>
+                                <div class="stat-value" id="patchCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
                         <div class="stat-box">
                             <div class="stat-icon bg-info">
                                 <i class="bi bi-stopwatch"></i>
@@ -102,6 +97,12 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Suspicious warning (hidden by default) -->
+                <div id="suspiciousWarning" class="alert alert-warning py-2 small mb-3" style="display:none;">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    A detection box covers most of the frame — result may be a false positive.
                 </div>
 
                 <!-- Image Comparison -->
@@ -205,10 +206,6 @@
     function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
-        
-        // Get selected model
-        const model = document.querySelector('input[name="model"]:checked').value;
-        formData.append('model', model);
 
         // Show progress
         progressBar.style.display = 'block';
@@ -238,9 +235,23 @@
     function displayResults(data) {
         // Update stats
         document.getElementById('totalDefects').textContent = data.total;
-        document.getElementById('totalCracks').textContent = data.counts.crack;
-        document.getElementById('totalCorrosion').textContent = data.counts.corrosion;
         document.getElementById('inferenceTime').textContent = data.inference_time;
+        document.getElementById('coverageRatio').textContent = (data.coverage_ratio || 0).toFixed(1) + '%';
+        document.getElementById('patchCount').textContent = data.patch_count || 0;
+
+        // Severity level with color
+        const sevEl = document.getElementById('severityLevel');
+        const sevColors = {
+            'NONE': '#6c757d', 'LOCALIZED': '#198754',
+            'DISTRIBUTED': '#ffc107', 'EXTENSIVE': '#dc3545'
+        };
+        const sev = data.severity_level || 'NONE';
+        sevEl.textContent = sev;
+        sevEl.style.color = sevColors[sev] || '#6c757d';
+
+        // Suspicious warning
+        document.getElementById('suspiciousWarning').style.display =
+            data.suspicious ? 'block' : 'none';
 
         // Update images
         document.getElementById('originalImage').src = data.original_image;
@@ -250,13 +261,13 @@
         // Update detections table
         const tableBody = document.getElementById('detectionsTable');
         tableBody.innerHTML = '';
-        
+
         data.detections.forEach((det, idx) => {
             const row = `
                 <tr>
                     <td>${idx + 1}</td>
                     <td>
-                        <span class="badge ${det.class === 'crack' ? 'bg-warning' : 'bg-danger'}">
+                        <span class="badge bg-danger">
                             ${det.class.toUpperCase()}
                         </span>
                     </td>

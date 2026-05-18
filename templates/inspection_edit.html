@@ -53,8 +53,8 @@
                         </div>
                         <div class="col-md-6">
                             <label for="bridge_location" class="form-label">Location</label>
-                            <input type="text" class="form-control" id="bridge_location" name="bridge_location" 
-                                   value="{{ inspection.location or '' }}" 
+                            <input type="text" class="form-control" id="bridge_location" name="bridge_location"
+                                   value="{{ inspection.bridge_location or '' }}"
                                    placeholder="e.g., Leyte-Samar">
                         </div>
                     </div>
@@ -138,17 +138,21 @@
                         <i class="bi bi-bar-chart"></i> Detection Summary
                     </h5>
                     <div class="row mb-4">
-                        <div class="col-md-4">
-                            <label class="form-label">Total Detections</label>
-                            <input type="text" class="form-control" value="{{ inspection.total_detections }}" readonly>
+                        <div class="col-md-3">
+                            <label class="form-label">Rust Detections</label>
+                            <input type="text" class="form-control" value="{{ inspection.rust_count }}" readonly>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Cracks</label>
-                            <input type="text" class="form-control" value="{{ inspection.crack_count }}" readonly>
+                        <div class="col-md-3">
+                            <label class="form-label">Severity Level</label>
+                            <input type="text" class="form-control" value="{{ inspection.severity_level or 'NONE' }}" readonly>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Corrosion</label>
-                            <input type="text" class="form-control" value="{{ inspection.corrosion_count }}" readonly>
+                        <div class="col-md-3">
+                            <label class="form-label">Coverage</label>
+                            <input type="text" class="form-control" value="{{ inspection.coverage_ratio or 0 }}%" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Patches</label>
+                            <input type="text" class="form-control" value="{{ inspection.patch_count or 0 }}" readonly>
                         </div>
                     </div>
 

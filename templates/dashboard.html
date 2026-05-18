@@ -18,19 +18,11 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1><i class="bi bi-speedometer2"></i> Monitoring Dashboard</h1>
-            <div>
-                <a href="{{ url_for('inspections_list') }}" class="btn btn-primary btn-sm me-2">
-                    <i class="bi bi-list-check"></i> View All Inspections
-                </a>
-                <button class="btn btn-outline-danger btn-sm" onclick="clearHistory()">
-                    <i class="bi bi-trash"></i> Clear History
-                </button>
-            </div>
         </div>
 
         <!-- Overview Stats -->
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -45,7 +37,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -60,7 +52,37 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-success">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Localized</div>
+                                <div class="stat-value">{{ stats.total_localized }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card stat-card">
+                    <div class="card-body">
+                        <div class="stat-box">
+                            <div class="stat-icon bg-warning">
+                                <i class="bi bi-exclamation-circle"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-label">Distributed</div>
+                                <div class="stat-value">{{ stats.total_distributed }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
                 <div class="card stat-card">
                     <div class="card-body">
                         <div class="stat-box">
@@ -68,8 +90,8 @@
                                 <i class="bi bi-exclamation-triangle"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Corrosion Found</div>
-                                <div class="stat-value">{{ stats.total_corrosion }}</div>
+                                <div class="stat-label">Extensive</div>
+                                <div class="stat-value">{{ stats.total_extensive }}</div>
                             </div>
                         </div>
                     </div>
@@ -82,7 +104,7 @@
             <div class="col-md-6">
                 <div class="card shadow-sm">
                     <div class="card-header bg-white">
-                        <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Corrosion Detection Trend</h6>
+                        <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Severity Breakdown</h6>
                     </div>
                     <div class="card-body">
                         <div class="chart-container">
@@ -121,8 +143,10 @@
                                         <th>Time</th>
                                         <th>Filename</th>
                                         <th>Model</th>
-                                        <th>Total Defects</th>
-                                        <th>Corrosion</th>
+                                        <th>Rust</th>
+                                        <th>Severity</th>
+                                        <th>Coverage</th>
+                                        <th>Source</th>
                                         <th>Inference (ms)</th>
                                         <th>Action</th>
                                     </tr>
@@ -151,10 +175,26 @@
                                             <span class="badge bg-secondary">{{ inspection.model }}</span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-primary">{{ inspection.total_detections }}</span>
+                                            <span class="badge bg-danger">{{ inspection.rust_count }}</span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-danger">{{ inspection.corrosion_count }}</span>
+                                            {% if inspection.severity_level == 'EXTENSIVE' %}
+                                                <span class="badge bg-danger">EXTENSIVE</span>
+                                            {% elif inspection.severity_level == 'DISTRIBUTED' %}
+                                                <span class="badge bg-warning text-dark">DISTRIBUTED</span>
+                                            {% elif inspection.severity_level == 'LOCALIZED' %}
+                                                <span class="badge bg-success">LOCALIZED</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">NONE</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ inspection.coverage_ratio or 0 }}%</td>
+                                        <td>
+                                            {% if inspection.upload_source == 'rpi5' %}
+                                                <span class="badge bg-primary">RPi5</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Web</span>
+                                            {% endif %}
                                         </td>
                                         <td>{{ inspection.inference_time }}</td>
                                         <td>
@@ -201,20 +241,22 @@
         // Data from Flask backend
         const data = {
             history: {{ history | tojson | safe }},
-            corrosion: {{ stats.total_corrosion or 0 }}
+            totalLocalized:   {{ stats.total_localized or 0 }},
+            totalDistributed: {{ stats.total_distributed or 0 }},
+            totalExtensive:   {{ stats.total_extensive or 0 }}
         };
 
-        // Bar Chart - Corrosion Detection Trend
+        // Bar Chart - Severity Breakdown
         const barCtx = document.getElementById('corrosionBarChart').getContext('2d');
         new Chart(barCtx, {
             type: 'bar',
             data: {
-                labels: ['Total Corrosion Detected'],
+                labels: ['Localized', 'Distributed', 'Extensive'],
                 datasets: [{
-                    label: 'Corrosion Count',
-                    data: [data.corrosion],
-                    backgroundColor: ['#dc3545'],
-                    borderColor: ['#bd2130'],
+                    label: 'Severity Count',
+                    data: [data.totalLocalized, data.totalDistributed, data.totalExtensive],
+                    backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+                    borderColor: ['#146c43', '#cc9a06', '#bd2130'],
                     borderWidth: 1
                 }]
             },
@@ -290,26 +332,5 @@
         });
     })();
 
-    // Clear history function (global scope for onclick)
-    function clearHistory() {
-        if (confirm('Are you sure you want to clear all inspection history?')) {
-            fetch('/clear-history', {
-                method: 'POST'
-            })
-            .then(function(response) {
-                return response.json();
-            })
-            .then(function(data) {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Failed to clear history: ' + data.error);
-                }
-            })
-            .catch(function(error) {
-                alert('Error: ' + error);
-            });
-        }
-    }
 </script>
 {% endblock %}

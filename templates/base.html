@@ -29,8 +29,18 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
-                            <i class="bi bi-cloud-upload"></i> Upload
+                        <a class="nav-link {% if request.path == '/new-inspection' %}active{% endif %}" href="/new-inspection">
+                            <i class="bi bi-plus-circle"></i> New Inspection
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/test-model' %}active{% endif %}" href="/test-model">
+                            <i class="bi bi-cpu"></i> Test Model
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path.startswith('/inspection') %}active{% endif %}" href="/inspections">
+                            <i class="bi bi-list-check"></i> Inspections
                         </a>
                     </li>
                     <li class="nav-item">
@@ -52,7 +62,7 @@
     <footer class="footer mt-auto py-3 bg-light">
         <div class="container text-center">
             <span class="text-muted">
-                Steel Bridge Defect Detection System | YOLOv8 & YOLOv11 | 2025
+                Steel Bridge Corrosion Detection System | YOLOv8n | 2026
             </span>
         </div>
     </footer>

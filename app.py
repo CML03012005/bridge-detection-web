@@ -1,14 +1,16 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
-from werkzeug.utils import secure_filename
+import json
 import os
-import cv2
-from datetime import datetime
-from ultralytics import YOLO
 import shutil
+from datetime import datetime
 
-# Import database and config
+import cv2
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from ultralytics import YOLO
+from werkzeug.utils import secure_filename
+
+from config import CONFIDENCE_THRESHOLD, FLASK_CONFIG, IOU_THRESHOLD
 from database import db
-from config import FLASK_CONFIG
+from severity import analyze_rust
 
 app = Flask(__name__)
 app.config.update(FLASK_CONFIG)
@@ -18,21 +20,22 @@ app.secret_key = FLASK_CONFIG['SECRET_KEY']
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
 
-# Load models
-print("Loading models...")
-try:
-    model_v8 = YOLO('models/yolov8n.pt')
-    print("✅ YOLOv8 model loaded")
-except Exception as e:
-    print(f"⚠️  YOLOv8 model not found: {e}")
-    model_v8 = None
+# Severity level → DPWH rating mapping (matches severity.py output)
+SEVERITY_TO_DPWH = {
+    'NONE':        'Good',
+    'LOCALIZED':   'Fair',
+    'DISTRIBUTED': 'Poor',
+    'EXTENSIVE':   'Bad',
+}
 
+# Load rust detection model (place trained best.pt in models/)
+print("Loading model...")
 try:
-    model_v11 = YOLO('models/yolo11n.pt')
-    print("✅ YOLOv11 model loaded")
+    rust_model = YOLO('models/best.pt')
+    print("✅ Rust detection model loaded")
 except Exception as e:
-    print(f"⚠️  YOLOv11 model not found: {e}")
-    model_v11 = None
+    print(f"⚠️  Model not found (models/best.pt): {e}")
+    rust_model = None
 
 # Test database connection
 if db.test_connection():
@@ -40,51 +43,57 @@ if db.test_connection():
 else:
     print("❌ Database connection failed - check MySQL and config.py")
 
+
 def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-def run_inference(image_path, model_version='v8'):
-    """Run YOLO inference on image"""
-    model = model_v8 if model_version == 'v8' else model_v11
-    
-    if model is None:
+
+def run_inference(image_path):
+    """Run YOLO inference on image and return detections + severity analysis"""
+    if rust_model is None:
         return None
-    
-    # Run inference
-    results = model.predict(image_path, conf=0.15, iou=0.45)
+    model = rust_model
+
+    results = model.predict(image_path, conf=CONFIDENCE_THRESHOLD, iou=IOU_THRESHOLD)
     result = results[0]
-    
-    # Prepare detection data
+
+    # Read image for color-based severity analysis
+    image_bgr = cv2.imread(image_path)
+    img_h, img_w = image_bgr.shape[:2] if image_bgr is not None else (640, 640)
+
     detections = []
-    class_counts = {'corrosion': 0, 'crack': 0}
-    
+    rust_count = 0
+
     for box in result.boxes:
         cls = int(box.cls[0])
         conf = float(box.conf[0])
         xyxy = box.xyxy[0].cpu().numpy()
-        
         class_name = result.names[cls]
-        
+
         detections.append({
             'class': class_name,
             'confidence': round(conf * 100, 2),
             'bbox': [float(x) for x in xyxy]
         })
-        
-        if class_name in class_counts:
-            class_counts[class_name] += 1
-    
+        rust_count += 1
+
+    # Run severity analysis
+    det_dicts = [{'bbox': d['bbox']} for d in detections]
+    severity_analysis = analyze_rust(det_dicts, (img_h, img_w), image_bgr)
+
     # Draw boxes on image
     annotated_img = result.plot()
-    
+
     return {
         'detections': detections,
-        'counts': class_counts,
+        'rust_count': rust_count,
         'total': len(detections),
         'annotated_image': annotated_img,
-        'inference_time': round(result.speed['inference'], 2)
+        'inference_time': round(result.speed['inference'], 2),
+        'severity_analysis': severity_analysis,
     }
+
 
 # ==========================================
 # MAIN ROUTES
@@ -92,136 +101,137 @@ def run_inference(image_path, model_version='v8'):
 
 @app.route('/')
 def index():
+    """Redirect root to dashboard"""
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/new-inspection')
+def new_inspection():
     """Main upload page"""
     return render_template('index.html')
+
 
 @app.route('/dashboard')
 def dashboard():
     """Dashboard page with MySQL data"""
     try:
-        # Get statistics from database
         stats_data = db.get_dashboard_stats()
-        
-        # Get recent inspections
         recent = db.get_recent_inspections(limit=10)
-        
-        # Get all inspections for charts
         all_inspections = db.get_all_inspections()
-        
+
         stats = {
-            'total_inspections': stats_data['total_inspections'] or 0,
-            'total_detections': stats_data['total_detections'] or 0,
-            'total_cracks': stats_data['total_cracks'] or 0,
-            'total_corrosion': stats_data['total_corrosion'] or 0,
-            'recent_inspections': recent
+            'total_inspections':  stats_data['total_inspections'] or 0,
+            'total_detections':   stats_data['total_detections'] or 0,
+            'total_rust':         stats_data['total_rust'] or 0,
+            'total_localized':    stats_data['total_localized'] or 0,
+            'total_distributed':  stats_data['total_distributed'] or 0,
+            'total_extensive':    stats_data['total_extensive'] or 0,
+            'recent_inspections': recent,
         }
-        
+
         return render_template('dashboard.html', stats=stats, history=all_inspections)
-    
+
     except Exception as e:
         print(f"Dashboard error: {e}")
-        # Fallback to empty data
         stats = {
-            'total_inspections': 0,
-            'total_detections': 0,
-            'total_cracks': 0,
-            'total_corrosion': 0,
-            'recent_inspections': []
+            'total_inspections': 0, 'total_detections': 0, 'total_rust': 0,
+            'total_localized': 0, 'total_distributed': 0, 'total_extensive': 0,
+            'recent_inspections': [],
         }
         return render_template('dashboard.html', stats=stats, history=[])
 
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload and run inference"""
+    """Handle direct image upload and run inference (web flow)"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
-    
+
     file = request.files['file']
-    model_version = request.form.get('model', 'v8')
-    
+
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
-    
+
     if not allowed_file(file.filename):
         return jsonify({'error': 'Invalid file type. Use PNG, JPG, or JPEG'}), 400
-    
+
     try:
-        # Save uploaded file
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         unique_filename = f"{timestamp}_{filename}"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(filepath)
-        
-        # Run inference
-        result = run_inference(filepath, model_version)
-        
+
+        result = run_inference(filepath)
+
         if result is None:
-            return jsonify({'error': f'Model YOLO{model_version.upper()} not available'}), 500
-        
-        # Handle zero detections
+            return jsonify({'error': 'Model not loaded. Place best.pt in models/ folder.'}), 500
+
+        # Save annotated image
+        result_filename = f"result_{unique_filename}"
+        result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
         if result['total'] == 0:
-            result_filename = f"result_{unique_filename}"
-            result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
             shutil.copy(filepath, result_path)
         else:
-            # Save annotated image
-            result_filename = f"result_{unique_filename}"
-            result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
             cv2.imwrite(result_path, result['annotated_image'])
-        
-        # Save to database
+
+        severity_analysis = result['severity_analysis']
+        dpwh_severity = SEVERITY_TO_DPWH.get(severity_analysis['severity'], 'Good')
+
         inspection_data = {
-            'timestamp': datetime.now(),
-            'filename': filename,
-            'model': model_version.upper(),
-            'bridge_name': None,
-            'bridge_location': None,
-            'bridge_type': None,
-            'inspector_name': None,
-            'weather_condition': None,
-            'temperature': None,
-            'inspection_notes': None,
-            'severity_rating': 'Good' if result['total'] == 0 else 'Fair',
-            'total_detections': result['total'],
-            'crack_count': result['counts']['crack'],
-            'corrosion_count': result['counts']['corrosion'],
-            'inference_time': result['inference_time'],
-            'original_image_path': f"/static/uploads/{unique_filename}",
-            'result_image_path': f"/static/results/{result_filename}"
+            'timestamp':            datetime.now(),
+            'filename':             filename,
+            'model':                'YOLOv8n-Rust',
+            'bridge_name':          None,
+            'bridge_location':      None,
+            'bridge_type':          None,
+            'inspector_name':       None,
+            'weather_condition':    None,
+            'temperature':          None,
+            'inspection_notes':     None,
+            'severity_rating':      dpwh_severity,
+            'total_detections':     result['total'],
+            'rust_count':           result['rust_count'],
+            'severity_level':       severity_analysis['severity'],
+            'coverage_ratio':       round(severity_analysis['coverage_ratio'] * 100, 2),
+            'patch_count':          severity_analysis['num_patches'],
+            'blur_score':           None,
+            'upload_source':        'web',
+            'inference_time':       result['inference_time'],
+            'original_image_path':  f"/static/uploads/{unique_filename}",
+            'result_image_path':    f"/static/results/{result_filename}",
         }
-        
+
         inspection_id = db.create_inspection(inspection_data)
-        
-        # Save individual detections
+
         for detection in result['detections']:
-            detection_data = {
+            db.create_detection({
                 'inspection_id': inspection_id,
-                'defect_type': detection['class'],
-                'confidence': detection['confidence'],
-                'bbox_x1': detection['bbox'][0],
-                'bbox_y1': detection['bbox'][1],
-                'bbox_x2': detection['bbox'][2],
-                'bbox_y2': detection['bbox'][3]
-            }
-            db.create_detection(detection_data)
-        
-        # Prepare response
-        response = {
-            'success': True,
-            'inspection_id': inspection_id,
-            'filename': filename,
-            'model': model_version.upper(),
-            'detections': result['detections'],
-            'counts': result['counts'],
-            'total': result['total'],
-            'inference_time': result['inference_time'],
-            'original_image': f"/static/uploads/{unique_filename}",
-            'result_image': f"/static/results/{result_filename}"
-        }
-        
-        return jsonify(response)
-    
+                'defect_type':   detection['class'],
+                'confidence':    detection['confidence'],
+                'bbox_x1':       detection['bbox'][0],
+                'bbox_y1':       detection['bbox'][1],
+                'bbox_x2':       detection['bbox'][2],
+                'bbox_y2':       detection['bbox'][3],
+            })
+
+        return jsonify({
+            'success':          True,
+            'inspection_id':    inspection_id,
+            'filename':         filename,
+            'model':            'YOLOv8n-Rust',
+            'detections':       result['detections'],
+            'rust_count':       result['rust_count'],
+            'total':            result['total'],
+            'severity_level':   severity_analysis['severity'],
+            'coverage_ratio':   round(severity_analysis['coverage_ratio'] * 100, 2),
+            'patch_count':      severity_analysis['num_patches'],
+            'suspicious':       severity_analysis['suspicious'],
+            'inference_time':   result['inference_time'],
+            'original_image':   f"/static/uploads/{unique_filename}",
+            'result_image':     f"/static/results/{result_filename}",
+        })
+
     except Exception as e:
         import traceback
         print("=" * 70)
@@ -230,30 +240,146 @@ def upload_file():
         print("=" * 70)
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/upload-rpi5', methods=['POST'])
+def upload_rpi5():
+    """
+    Receive a detection result uploaded from the Raspberry Pi 5.
+    Accepts the annotated image + pre-computed metadata (no inference needed).
+
+    Expected form fields:
+        file            — annotated image (required)
+        original_file   — original image before annotation (optional)
+        detections      — JSON string of detection list
+        inference_time  — float (ms)
+        severity_level  — NONE / LOCALIZED / DISTRIBUTED / EXTENSIVE
+        coverage_ratio  — float 0-100 (percentage)
+        patch_count     — int
+        blur_score      — float (Laplacian variance)
+        model           — model name string (e.g. "YOLOv8n-ONNX")
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid or missing file'}), 400
+
+    try:
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"rpi5_{timestamp}_{filename}"
+
+        # Save annotated image as the result image
+        result_filename = f"result_{unique_filename}"
+        result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
+        file.save(result_path)
+
+        # Save original image if provided, otherwise reuse the annotated one
+        original_file = request.files.get('original_file')
+        if original_file and original_file.filename:
+            orig_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            original_file.save(orig_path)
+            original_image_path = f"/static/uploads/{unique_filename}"
+        else:
+            shutil.copy(result_path, os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
+            original_image_path = f"/static/uploads/{unique_filename}"
+
+        # Parse metadata from form
+        detections_raw = request.form.get('detections', '[]')
+        detections = json.loads(detections_raw)
+
+        severity_level  = request.form.get('severity_level', 'NONE')
+        coverage_ratio  = float(request.form.get('coverage_ratio', 0))
+        patch_count     = int(request.form.get('patch_count', 0))
+        blur_score      = request.form.get('blur_score')
+        blur_score      = float(blur_score) if blur_score else None
+        inference_time  = float(request.form.get('inference_time', 0))
+        model_name      = request.form.get('model', 'YOLOv8n-ONNX')
+        rust_count      = len(detections)
+        dpwh_severity   = SEVERITY_TO_DPWH.get(severity_level, 'Good')
+
+        inspection_data = {
+            'timestamp':            datetime.now(),
+            'filename':             filename,
+            'model':                model_name,
+            'bridge_name':          None,
+            'bridge_location':      None,
+            'bridge_type':          None,
+            'inspector_name':       None,
+            'weather_condition':    None,
+            'temperature':          None,
+            'inspection_notes':     None,
+            'severity_rating':      dpwh_severity,
+            'total_detections':     rust_count,
+            'rust_count':           rust_count,
+            'severity_level':       severity_level,
+            'coverage_ratio':       coverage_ratio,
+            'patch_count':          patch_count,
+            'blur_score':           blur_score,
+            'upload_source':        'rpi5',
+            'inference_time':       inference_time,
+            'original_image_path':  original_image_path,
+            'result_image_path':    f"/static/results/{result_filename}",
+        }
+
+        inspection_id = db.create_inspection(inspection_data)
+
+        for detection in detections:
+            bbox = detection.get('bbox', [0, 0, 0, 0])
+            db.create_detection({
+                'inspection_id': inspection_id,
+                'defect_type':   detection.get('class', 'rust'),
+                'confidence':    detection.get('confidence', 0),
+                'bbox_x1':       bbox[0],
+                'bbox_y1':       bbox[1],
+                'bbox_x2':       bbox[2],
+                'bbox_y2':       bbox[3],
+            })
+
+        return jsonify({
+            'success':       True,
+            'inspection_id': inspection_id,
+            'message':       'RPi5 detection uploaded successfully',
+        })
+
+    except Exception as e:
+        import traceback
+        print("=" * 70)
+        print("ERROR IN /upload-rpi5:")
+        print(traceback.format_exc())
+        print("=" * 70)
+        return jsonify({'error': str(e)}), 500
+
+
 # ==========================================
 # CRUD ROUTES - INSPECTIONS
 # ==========================================
 
 @app.route('/inspections')
 def inspections_list():
-    """List all inspections"""
+    """List all inspections, with optional source filter (?source=rpi5|web)"""
     try:
         page = request.args.get('page', 1, type=int)
+        source = request.args.get('source', None)  # 'rpi5', 'web', or None = all
         per_page = 20
         offset = (page - 1) * per_page
-        
-        inspections = db.get_all_inspections(limit=per_page, offset=offset)
-        total = db.get_inspection_count()
+
+        inspections = db.get_all_inspections(limit=per_page, offset=offset, source=source)
+        total = db.get_inspection_count(source=source)
         total_pages = (total + per_page - 1) // per_page
-        
-        return render_template('inspections_list.html', 
-                             inspections=inspections,
-                             page=page,
-                             total_pages=total_pages,
-                             total=total)
+
+        return render_template('inspections_list.html',
+                               inspections=inspections,
+                               page=page,
+                               total_pages=total_pages,
+                               total=total,
+                               active_source=source or 'all')
     except Exception as e:
         flash(f'Error loading inspections: {str(e)}', 'danger')
-        return render_template('inspections_list.html', inspections=[], page=1, total_pages=1, total=0)
+        return render_template('inspections_list.html', inspections=[], page=1, total_pages=1, total=0,
+                               active_source='all')
+
 
 @app.route('/inspection/<int:inspection_id>')
 def inspection_detail(inspection_id):
@@ -263,15 +389,15 @@ def inspection_detail(inspection_id):
         if not inspection:
             flash('Inspection not found', 'warning')
             return redirect(url_for('inspections_list'))
-        
+
         detections = db.get_detections_by_inspection(inspection_id)
-        
-        return render_template('inspection_detail.html', 
-                             inspection=inspection,
-                             detections=detections)
+        return render_template('inspection_detail.html',
+                               inspection=inspection,
+                               detections=detections)
     except Exception as e:
         flash(f'Error loading inspection: {str(e)}', 'danger')
         return redirect(url_for('inspections_list'))
+
 
 @app.route('/inspection/<int:inspection_id>/edit', methods=['GET', 'POST'])
 def inspection_edit(inspection_id):
@@ -279,90 +405,229 @@ def inspection_edit(inspection_id):
     if request.method == 'POST':
         try:
             update_data = {
-                'bridge_name': request.form.get('bridge_name'),
-                'bridge_location': request.form.get('bridge_location'),
-                'bridge_type': request.form.get('bridge_type'),
-                'inspector_name': request.form.get('inspector_name'),
+                'bridge_name':       request.form.get('bridge_name'),
+                'bridge_location':   request.form.get('bridge_location'),
+                'bridge_type':       request.form.get('bridge_type'),
+                'inspector_name':    request.form.get('inspector_name'),
                 'weather_condition': request.form.get('weather_condition'),
-                'temperature': request.form.get('temperature') or None,
-                'inspection_notes': request.form.get('inspection_notes'),
-                'severity_rating': request.form.get('severity_rating')
+                'temperature':       request.form.get('temperature') or None,
+                'inspection_notes':  request.form.get('inspection_notes'),
+                'severity_rating':   request.form.get('severity_rating'),
             }
-            
+
             success = db.update_inspection(inspection_id, update_data)
-            
+
             if success:
                 flash('Inspection updated successfully', 'success')
                 return redirect(url_for('inspection_detail', inspection_id=inspection_id))
             else:
                 flash('Failed to update inspection', 'danger')
-        
+
         except Exception as e:
             flash(f'Error updating inspection: {str(e)}', 'danger')
-    
-    # GET request - show edit form
+
     inspection = db.get_inspection(inspection_id)
     if not inspection:
         flash('Inspection not found', 'warning')
         return redirect(url_for('inspections_list'))
-    
+
     return render_template('inspection_edit.html', inspection=inspection)
+
 
 @app.route('/inspection/<int:inspection_id>/delete', methods=['POST'])
 def inspection_delete(inspection_id):
     """Delete inspection"""
     try:
-        # Get inspection to delete associated images
         inspection = db.get_inspection(inspection_id)
-        
+
         if inspection:
-            # Delete from database
             success = db.delete_inspection(inspection_id)
-            
+
             if success:
-                # Delete image files
                 try:
-                    if inspection['original_image_path']:
-                        original_path = inspection['original_image_path'].lstrip('/')
-                        if os.path.exists(original_path):
-                            os.remove(original_path)
-                    
-                    if inspection['result_image_path']:
-                        result_path = inspection['result_image_path'].lstrip('/')
-                        if os.path.exists(result_path):
-                            os.remove(result_path)
+                    for path_key in ('original_image_path', 'result_image_path'):
+                        path = inspection.get(path_key, '')
+                        if path:
+                            local_path = path.lstrip('/')
+                            if os.path.exists(local_path):
+                                os.remove(local_path)
                 except Exception as img_err:
                     print(f"Error deleting images: {img_err}")
-                
+
                 flash('Inspection deleted successfully', 'success')
             else:
                 flash('Failed to delete inspection', 'danger')
         else:
             flash('Inspection not found', 'warning')
-    
+
     except Exception as e:
         flash(f'Error deleting inspection: {str(e)}', 'danger')
-    
+
     return redirect(url_for('inspections_list'))
+
+
+@app.route('/test-model')
+def test_model():
+    """Test model page — run detection without saving to DB"""
+    return render_template('test_model.html')
+
+
+@app.route('/api/test-detect', methods=['POST'])
+def test_detect():
+    """
+    Run full inference + severity.py on uploaded image.
+    Saves images to static folders but does NOT create a DB record —
+    the user decides whether to save via the 'Add to Inspections' button
+    which calls /api/save-inspection.
+    """
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Invalid file'}), 400
+
+    if rust_model is None:
+        return jsonify({'error': 'Model not loaded. Place best.pt in models/'}), 500
+
+    try:
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(filepath)
+
+        # Full inference + severity.py at configured threshold
+        result = run_inference(filepath)
+        if result is None:
+            return jsonify({'error': 'Inference failed'}), 500
+
+        result_filename = f"result_{unique_filename}"
+        result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
+        if result['total'] == 0:
+            shutil.copy(filepath, result_path)
+        else:
+            cv2.imwrite(result_path, result['annotated_image'])
+
+        severity_analysis = result['severity_analysis']
+
+        # Low-threshold run for slider exploration
+        raw_results = rust_model.predict(filepath, conf=0.01, iou=0.01, verbose=False)
+        raw_result = raw_results[0]
+        img = cv2.imread(filepath)
+        img_h, img_w = img.shape[:2] if img is not None else (640, 640)
+
+        all_detections = []
+        for box in raw_result.boxes:
+            cls = int(box.cls[0])
+            conf = float(box.conf[0])
+            xyxy = box.xyxy[0].cpu().numpy()
+            all_detections.append({
+                'class':      raw_result.names[cls],
+                'confidence': round(conf, 4),
+                'bbox':       [round(float(x), 1) for x in xyxy],
+            })
+
+        return jsonify({
+            'success':              True,
+            'all_detections':       all_detections,
+            'saved_detections':     result['detections'],   # proper-threshold detections for DB save
+            'img_width':            img_w,
+            'img_height':           img_h,
+            'inference_time':       result['inference_time'],
+            'conf_threshold':       CONFIDENCE_THRESHOLD,
+            'severity_level':       severity_analysis['severity'],
+            'coverage_ratio':       round(severity_analysis['coverage_ratio'] * 100, 2),
+            'patch_count':          severity_analysis['num_patches'],
+            'filename':             filename,
+            'original_image_path':  f"/static/uploads/{unique_filename}",
+            'result_image_path':    f"/static/results/{result_filename}",
+        })
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/save-inspection', methods=['POST'])
+def save_inspection():
+    """
+    Create a DB record from a previously run test detection.
+    Called when the user clicks 'Add to Inspections' on the Test Model page.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    try:
+        severity_level = data.get('severity_level', 'NONE')
+        dpwh_severity  = SEVERITY_TO_DPWH.get(severity_level, 'Good')
+        detections     = data.get('detections', [])
+
+        inspection_data = {
+            'timestamp':            datetime.now(),
+            'filename':             data.get('filename', ''),
+            'model':                'YOLOv8n-Rust',
+            'bridge_name':          None,
+            'bridge_location':      None,
+            'bridge_type':          None,
+            'inspector_name':       None,
+            'weather_condition':    None,
+            'temperature':          None,
+            'inspection_notes':     None,
+            'severity_rating':      dpwh_severity,
+            'total_detections':     len(detections),
+            'rust_count':           len(detections),
+            'severity_level':       severity_level,
+            'coverage_ratio':       data.get('coverage_ratio', 0),
+            'patch_count':          data.get('patch_count', 0),
+            'blur_score':           None,
+            'upload_source':        'web',
+            'inference_time':       data.get('inference_time', 0),
+            'original_image_path':  data.get('original_image_path', ''),
+            'result_image_path':    data.get('result_image_path', ''),
+        }
+
+        inspection_id = db.create_inspection(inspection_data)
+
+        for det in detections:
+            bbox = det.get('bbox', [0, 0, 0, 0])
+            db.create_detection({
+                'inspection_id': inspection_id,
+                'defect_type':   det.get('class', 'rust'),
+                'confidence':    det.get('confidence', 0),
+                'bbox_x1':       bbox[0],
+                'bbox_y1':       bbox[1],
+                'bbox_x2':       bbox[2],
+                'bbox_y2':       bbox[3],
+            })
+
+        return jsonify({'success': True, 'inspection_id': inspection_id})
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/search')
 def search():
     """Search inspections"""
     query = request.args.get('q', '').strip()
-    
+
     if query:
-        # Search with query
         inspections = db.search_inspections(query)
     else:
-        # No query - redirect to full list
         return redirect(url_for('inspections_list'))
-    
-    return render_template('inspections_list.html', 
-                         inspections=inspections,
-                         search_query=query,
-                         page=1,
-                         total_pages=1,
-                         total=len(inspections))
+
+    return render_template('inspections_list.html',
+                           inspections=inspections,
+                           search_query=query,
+                           page=1,
+                           total_pages=1,
+                           total=len(inspections))
+
 
 # ==========================================
 # API ROUTES
@@ -374,22 +639,16 @@ def clear_history():
     try:
         with db.get_connection() as conn:
             with conn.cursor() as cursor:
-                # Delete all inspections (cascades to detections)
                 cursor.execute("DELETE FROM inspections")
                 conn.commit()
                 deleted_count = cursor.rowcount
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Cleared {deleted_count} inspection(s)'
-        })
-    
+
+        return jsonify({'success': True, 'message': f'Cleared {deleted_count} inspection(s)'})
+
     except Exception as e:
         print(f"Error clearing history: {e}")
-        return jsonify({
-            'success': False, 
-            'error': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/stats')
 def get_stats():
@@ -397,22 +656,26 @@ def get_stats():
     try:
         stats = db.get_dashboard_stats()
         return jsonify({
-            'total_inspections': stats['total_inspections'] or 0,
-            'total_detections': stats['total_detections'] or 0,
-            'total_cracks': stats['total_cracks'] or 0,
-            'total_corrosion': stats['total_corrosion'] or 0
+            'total_inspections':  stats['total_inspections'] or 0,
+            'total_detections':   stats['total_detections'] or 0,
+            'total_rust':         stats['total_rust'] or 0,
+            'total_localized':    stats['total_localized'] or 0,
+            'total_distributed':  stats['total_distributed'] or 0,
+            'total_extensive':    stats['total_extensive'] or 0,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 if __name__ == '__main__':
     print("\n" + "=" * 70)
-    print("🌉 STEEL BRIDGE DEFECT DETECTION - WEB INTERFACE (MySQL)")
+    print("🌉 BRIDGE CORROSION DETECTION - WEB INTERFACE (MySQL)")
     print("=" * 70)
     print(f"✅ Flask server starting...")
     print(f"🔗 Open your browser to: http://127.0.0.1:5000")
     print(f"📊 Dashboard: http://127.0.0.1:5000/dashboard")
     print(f"📋 Inspections: http://127.0.0.1:5000/inspections")
+    print(f"📡 RPi5 Upload endpoint: POST http://127.0.0.1:5000/upload-rpi5")
     print("=" * 70 + "\n")
-    
+
     app.run(debug=True, host='0.0.0.0', port=5000)
