@@ -32,7 +32,7 @@ CREATE TABLE inspections (
     rust_count INT DEFAULT 0,
 
     -- Severity Analysis (from severity.py)
-    severity_level ENUM('NONE', 'LOCALIZED', 'DISTRIBUTED', 'EXTENSIVE') DEFAULT 'NONE',
+    severity_level ENUM('NONE', 'LOW', 'MEDIUM', 'HIGH') DEFAULT 'NONE',
     coverage_ratio DECIMAL(5,2) DEFAULT 0,
     patch_count INT DEFAULT 0,
     blur_score DECIMAL(8,2) DEFAULT NULL,
@@ -97,7 +97,7 @@ INSERT INTO inspections (
 ) VALUES (
     NOW(), 'sample_bridge.jpg', 'YOLOv8n',
     'San Juanico Bridge', 'Leyte-Samar',
-    'Test Inspector', 'Fair', 'LOCALIZED',
+    'Test Inspector', 'Fair', 'LOW',
     2, 2, 4.50, 1,
     150.5,
     '/static/uploads/sample.jpg', '/static/results/sample.jpg',

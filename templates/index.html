@@ -242,8 +242,8 @@
         // Severity level with color
         const sevEl = document.getElementById('severityLevel');
         const sevColors = {
-            'NONE': '#6c757d', 'LOCALIZED': '#198754',
-            'DISTRIBUTED': '#ffc107', 'EXTENSIVE': '#dc3545'
+            'NONE': '#6c757d', 'LOW': '#198754',
+            'MEDIUM': '#ffc107', 'HIGH': '#dc3545'
         };
         const sev = data.severity_level || 'NONE';
         sevEl.textContent = sev;

@@ -268,10 +268,10 @@
     function showSavedSeverity(level, coverage, patches) {
         const badge = document.getElementById('savedSeverity');
         const sevColors = {
-            'EXTENSIVE':   'bg-danger',
-            'DISTRIBUTED': 'bg-warning text-dark',
-            'LOCALIZED':   'bg-success',
-            'NONE':        'bg-secondary',
+            'HIGH':   'bg-danger',
+            'MEDIUM': 'bg-warning text-dark',
+            'LOW':    'bg-success',
+            'NONE':   'bg-secondary',
         };
         badge.className = 'badge ' + (sevColors[level] || 'bg-secondary');
         badge.textContent = level || 'NONE';
@@ -382,34 +382,36 @@
         });
     }
 
-    // ── Live severity (box-area approximation for explorer) ───────────────
+    // ── Live severity: max-wins over visible detections' classes ──────────
     function updateLiveSeverity(detections) {
         const badge    = document.getElementById('liveSeverity');
         const coverage = document.getElementById('liveCoverage');
 
-        if (detections.length === 0) {
-            badge.className = 'badge bg-secondary'; badge.textContent = 'NONE';
-            coverage.textContent = '0.0%';
-            return;
-        }
-
+        // Coverage is still shown as an informational box-area approximation
         let totalBox = 0;
         detections.forEach(d => {
             totalBox += (d.bbox[2] - d.bbox[0]) * (d.bbox[3] - d.bbox[1]);
         });
-        const ratio = Math.min(totalBox / (imgWidth * imgHeight), 1.0);
+        const ratio = (imgWidth && imgHeight)
+            ? Math.min(totalBox / (imgWidth * imgHeight), 1.0)
+            : 0;
         coverage.textContent = (ratio * 100).toFixed(1) + '%';
 
-        let severity, cls;
-        if (ratio >= 0.35) {
-            severity = 'EXTENSIVE';   cls = 'badge bg-danger';
-        } else if (ratio >= 0.15 || detections.length > 2) {
-            severity = 'DISTRIBUTED'; cls = 'badge bg-warning text-dark';
-        } else {
-            severity = 'LOCALIZED';   cls = 'badge bg-success';
-        }
-        badge.className   = cls;
-        badge.textContent = severity;
+        const rank = { NONE: 0, LOW: 1, MEDIUM: 2, HIGH: 3 };
+        let best = 'NONE';
+        detections.forEach(d => {
+            const c = (d.class || '').toUpperCase();
+            if (rank[c] !== undefined && rank[c] > rank[best]) best = c;
+        });
+
+        const sevColors = {
+            'HIGH':   'badge bg-danger',
+            'MEDIUM': 'badge bg-warning text-dark',
+            'LOW':    'badge bg-success',
+            'NONE':   'badge bg-secondary',
+        };
+        badge.className   = sevColors[best];
+        badge.textContent = best;
     }
 
     // ── Global helpers ─────────────────────────────────────────────────────

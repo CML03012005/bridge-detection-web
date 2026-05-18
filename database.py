@@ -159,9 +159,9 @@ class Database:
                     COUNT(*) as total_inspections,
                     SUM(total_detections) as total_detections,
                     SUM(rust_count) as total_rust,
-                    SUM(CASE WHEN severity_level = 'LOCALIZED'    THEN 1 ELSE 0 END) as total_localized,
-                    SUM(CASE WHEN severity_level = 'DISTRIBUTED'  THEN 1 ELSE 0 END) as total_distributed,
-                    SUM(CASE WHEN severity_level = 'EXTENSIVE'    THEN 1 ELSE 0 END) as total_extensive,
+                    SUM(CASE WHEN severity_level = 'LOW'    THEN 1 ELSE 0 END) as total_low,
+                    SUM(CASE WHEN severity_level = 'MEDIUM' THEN 1 ELSE 0 END) as total_medium,
+                    SUM(CASE WHEN severity_level = 'HIGH'   THEN 1 ELSE 0 END) as total_high,
                     AVG(inference_time) as avg_inference_time
                 FROM inspections
                 """

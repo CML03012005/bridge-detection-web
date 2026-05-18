@@ -122,12 +122,12 @@
                             <span class="badge bg-danger">{{ inspection.rust_count }}</span>
                         </td>
                         <td>
-                            {% if inspection.severity_level == 'EXTENSIVE' %}
-                                <span class="badge bg-danger">EXTENSIVE</span>
-                            {% elif inspection.severity_level == 'DISTRIBUTED' %}
-                                <span class="badge bg-warning text-dark">DISTRIBUTED</span>
-                            {% elif inspection.severity_level == 'LOCALIZED' %}
-                                <span class="badge bg-success">LOCALIZED</span>
+                            {% if inspection.severity_level == 'HIGH' %}
+                                <span class="badge bg-danger">HIGH</span>
+                            {% elif inspection.severity_level == 'MEDIUM' %}
+                                <span class="badge bg-warning text-dark">MEDIUM</span>
+                            {% elif inspection.severity_level == 'LOW' %}
+                                <span class="badge bg-success">LOW</span>
                             {% else %}
                                 <span class="badge bg-secondary">NONE</span>
                             {% endif %}

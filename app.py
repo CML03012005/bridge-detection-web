@@ -22,10 +22,10 @@ os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
 
 # Severity level → DPWH rating mapping (matches severity.py output)
 SEVERITY_TO_DPWH = {
-    'NONE':        'Good',
-    'LOCALIZED':   'Fair',
-    'DISTRIBUTED': 'Poor',
-    'EXTENSIVE':   'Bad',
+    'NONE':   'Good',
+    'LOW':    'Fair',
+    'MEDIUM': 'Poor',
+    'HIGH':   'Bad',
 }
 
 # Load rust detection model (place trained best.pt in models/)
@@ -78,9 +78,8 @@ def run_inference(image_path):
         })
         rust_count += 1
 
-    # Run severity analysis
-    det_dicts = [{'bbox': d['bbox']} for d in detections]
-    severity_analysis = analyze_rust(det_dicts, (img_h, img_w), image_bgr)
+    # Run severity analysis (uses per-detection 'class' for max-wins aggregation)
+    severity_analysis = analyze_rust(detections, (img_h, img_w), image_bgr)
 
     # Draw boxes on image
     annotated_img = result.plot()
@@ -123,9 +122,9 @@ def dashboard():
             'total_inspections':  stats_data['total_inspections'] or 0,
             'total_detections':   stats_data['total_detections'] or 0,
             'total_rust':         stats_data['total_rust'] or 0,
-            'total_localized':    stats_data['total_localized'] or 0,
-            'total_distributed':  stats_data['total_distributed'] or 0,
-            'total_extensive':    stats_data['total_extensive'] or 0,
+            'total_low':          stats_data['total_low'] or 0,
+            'total_medium':       stats_data['total_medium'] or 0,
+            'total_high':         stats_data['total_high'] or 0,
             'recent_inspections': recent,
         }
 
@@ -135,7 +134,7 @@ def dashboard():
         print(f"Dashboard error: {e}")
         stats = {
             'total_inspections': 0, 'total_detections': 0, 'total_rust': 0,
-            'total_localized': 0, 'total_distributed': 0, 'total_extensive': 0,
+            'total_low': 0, 'total_medium': 0, 'total_high': 0,
             'recent_inspections': [],
         }
         return render_template('dashboard.html', stats=stats, history=[])
@@ -252,7 +251,7 @@ def upload_rpi5():
         original_file   — original image before annotation (optional)
         detections      — JSON string of detection list
         inference_time  — float (ms)
-        severity_level  — NONE / LOCALIZED / DISTRIBUTED / EXTENSIVE
+        severity_level  — NONE / LOW / MEDIUM / HIGH
         coverage_ratio  — float 0-100 (percentage)
         patch_count     — int
         blur_score      — float (Laplacian variance)
@@ -659,9 +658,9 @@ def get_stats():
             'total_inspections':  stats['total_inspections'] or 0,
             'total_detections':   stats['total_detections'] or 0,
             'total_rust':         stats['total_rust'] or 0,
-            'total_localized':    stats['total_localized'] or 0,
-            'total_distributed':  stats['total_distributed'] or 0,
-            'total_extensive':    stats['total_extensive'] or 0,
+            'total_low':          stats['total_low'] or 0,
+            'total_medium':       stats['total_medium'] or 0,
+            'total_high':         stats['total_high'] or 0,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

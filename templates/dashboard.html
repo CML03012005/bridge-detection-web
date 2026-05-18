@@ -60,8 +60,8 @@
                                 <i class="bi bi-check-circle"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Localized</div>
-                                <div class="stat-value">{{ stats.total_localized }}</div>
+                                <div class="stat-label">Low</div>
+                                <div class="stat-value">{{ stats.total_low }}</div>
                             </div>
                         </div>
                     </div>
@@ -75,8 +75,8 @@
                                 <i class="bi bi-exclamation-circle"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Distributed</div>
-                                <div class="stat-value">{{ stats.total_distributed }}</div>
+                                <div class="stat-label">Medium</div>
+                                <div class="stat-value">{{ stats.total_medium }}</div>
                             </div>
                         </div>
                     </div>
@@ -90,8 +90,8 @@
                                 <i class="bi bi-exclamation-triangle"></i>
                             </div>
                             <div class="stat-content">
-                                <div class="stat-label">Extensive</div>
-                                <div class="stat-value">{{ stats.total_extensive }}</div>
+                                <div class="stat-label">High</div>
+                                <div class="stat-value">{{ stats.total_high }}</div>
                             </div>
                         </div>
                     </div>
@@ -178,12 +178,12 @@
                                             <span class="badge bg-danger">{{ inspection.rust_count }}</span>
                                         </td>
                                         <td>
-                                            {% if inspection.severity_level == 'EXTENSIVE' %}
-                                                <span class="badge bg-danger">EXTENSIVE</span>
-                                            {% elif inspection.severity_level == 'DISTRIBUTED' %}
-                                                <span class="badge bg-warning text-dark">DISTRIBUTED</span>
-                                            {% elif inspection.severity_level == 'LOCALIZED' %}
-                                                <span class="badge bg-success">LOCALIZED</span>
+                                            {% if inspection.severity_level == 'HIGH' %}
+                                                <span class="badge bg-danger">HIGH</span>
+                                            {% elif inspection.severity_level == 'MEDIUM' %}
+                                                <span class="badge bg-warning text-dark">MEDIUM</span>
+                                            {% elif inspection.severity_level == 'LOW' %}
+                                                <span class="badge bg-success">LOW</span>
                                             {% else %}
                                                 <span class="badge bg-secondary">NONE</span>
                                             {% endif %}
@@ -241,9 +241,9 @@
         // Data from Flask backend
         const data = {
             history: {{ history | tojson | safe }},
-            totalLocalized:   {{ stats.total_localized or 0 }},
-            totalDistributed: {{ stats.total_distributed or 0 }},
-            totalExtensive:   {{ stats.total_extensive or 0 }}
+            totalLow:    {{ stats.total_low or 0 }},
+            totalMedium: {{ stats.total_medium or 0 }},
+            totalHigh:   {{ stats.total_high or 0 }}
         };
 
         // Bar Chart - Severity Breakdown
@@ -251,10 +251,10 @@
         new Chart(barCtx, {
             type: 'bar',
             data: {
-                labels: ['Localized', 'Distributed', 'Extensive'],
+                labels: ['Low', 'Medium', 'High'],
                 datasets: [{
                     label: 'Severity Count',
-                    data: [data.totalLocalized, data.totalDistributed, data.totalExtensive],
+                    data: [data.totalLow, data.totalMedium, data.totalHigh],
                     backgroundColor: ['#198754', '#ffc107', '#dc3545'],
                     borderColor: ['#146c43', '#cc9a06', '#bd2130'],
                     borderWidth: 1
