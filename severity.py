@@ -2,16 +2,16 @@
 Rust severity aggregation for RustWatch.
 
 The YOLO model classifies each detection as 'low', 'medium', or 'high'. This
-module aggregates the per-detection labels into a single per-image severity
-using max-wins: any HIGH → HIGH, else any MEDIUM → MEDIUM, else any LOW → LOW,
-else NONE. `rust_stain` detections are ignored for severity and coverage.
+module aggregates per-detection labels into a single per-image severity using
+max-wins: any HIGH → HIGH, else any MEDIUM → MEDIUM, else any LOW → LOW, else
+NONE. Unknown class labels are ignored.
 
-Coverage and patch count are still computed as informational metrics for the
-dashboard, but they no longer drive the severity label.
+Coverage and patch count are computed as informational metrics for the
+dashboard; they do not drive the severity label.
 
 Each detection dict must have:
   - 'bbox':  [x1, y1, x2, y2]
-  - 'class': 'low' | 'medium' | 'high' | 'rust_stain' (case-insensitive)
+  - 'class': 'low' | 'medium' | 'high' (case-insensitive)
 
 image_size is (height, width). Pass image_bgr for color-based coverage; omit
 it to fall back to box-area coverage.
@@ -31,9 +31,7 @@ _RUST_HSV_RANGES = [
     (np.array([165, 60,  40]), np.array([180, 255, 255])),
 ]
 
-# Severity hierarchy for max-wins aggregation
-_SEVERITY_RANK = {'NONE': 0, 'LOW': 1, 'MEDIUM': 2, 'HIGH': 3}
-_SEVERITY_CLASSES = {'low', 'medium', 'high'}  # rust_stain deliberately excluded
+_SEVERITY_RANK = {'LOW': 1, 'MEDIUM': 2, 'HIGH': 3}
 
 
 def _rust_mask_in_boxes(
@@ -119,18 +117,13 @@ def calculate_metrics(
 
 
 def aggregate_severity(detections: list[dict]) -> str:
-    """Aggregate per-detection class labels into a single severity (max-wins).
-
-    rust_stain detections are ignored.
-    """
-    best = 'NONE'
+    """Aggregate per-detection class labels into a single severity (max-wins)."""
+    best, best_rank = 'NONE', 0
     for det in detections:
-        cls = (det.get('class') or '').lower()
-        if cls not in _SEVERITY_CLASSES:
-            continue
-        label = cls.upper()
-        if _SEVERITY_RANK[label] > _SEVERITY_RANK[best]:
-            best = label
+        label = (det.get('class') or '').upper()
+        rank = _SEVERITY_RANK.get(label, 0)
+        if rank > best_rank:
+            best, best_rank = label, rank
     return best
 
 
@@ -145,27 +138,18 @@ def analyze_rust(
         num_patches, coverage_ratio, avg_patch_size, max_patch_size,
         coverage_method, severity ('NONE'/'LOW'/'MEDIUM'/'HIGH'), suspicious.
     """
-    empty_metrics = {
-        "num_patches": 0,
-        "coverage_ratio": 0.0,
-        "avg_patch_size": 0.0,
-        "max_patch_size": 0,
-        "coverage_method": "color" if image_bgr is not None else "box_area",
-    }
-
     if not detections:
-        return {**empty_metrics, "severity": "NONE", "suspicious": False}
+        return {
+            "num_patches": 0,
+            "coverage_ratio": 0.0,
+            "avg_patch_size": 0.0,
+            "max_patch_size": 0,
+            "coverage_method": "color" if image_bgr is not None else "box_area",
+            "severity": "NONE",
+            "suspicious": False,
+        }
 
-    severity_detections = [
-        d for d in detections
-        if (d.get('class') or '').lower() in _SEVERITY_CLASSES
-    ]
-
-    metrics = (
-        calculate_metrics(severity_detections, image_size, image_bgr)
-        if severity_detections else empty_metrics
-    )
-
+    metrics = calculate_metrics(detections, image_size, image_bgr)
     severity = aggregate_severity(detections)
 
     total_pixels = image_size[0] * image_size[1]
@@ -182,7 +166,7 @@ def analyze_rust(
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     sample_detections = [
-        {"bbox": [50, 60, 200, 180],  "class": "low"},
+        {"bbox": [50, 60, 200, 180],   "class": "low"},
         {"bbox": [300, 100, 420, 250], "class": "medium"},
     ]
     image_size = (480, 640)

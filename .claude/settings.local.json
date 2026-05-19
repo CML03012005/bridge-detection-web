@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "D:\\project\\RPI5\\CORROSION-DETECTION\\scripts"
+    ],
+    "allow": [
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\(r'D:\\\\project\\\\RPI5\\\\CORROSION-DETECTION\\\\scripts\\\\corrosion_detection.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\(r'D:\\\\project\\\\RPI5\\\\CORROSION-DETECTION\\\\scripts\\\\severity.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\(r'd:\\\\project\\\\bridge-detection-web\\\\severity.py', encoding='utf-8'\\).read\\(\\)\\); print\\('All three files OK'\\)\")"
+    ]
+  }
+}
