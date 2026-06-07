@@ -46,7 +46,7 @@ main {
 .upload-area {
     border: 3px dashed #dee2e6;
     border-radius: 12px;
-    padding: 60px 20px;
+    padding: 40px 20px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;

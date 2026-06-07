@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Inspection #{{ inspection.id }} - Bridge Defect Detection{% endblock %}
+{% block title %}Edit Inspection #{{ inspection.id }} — RustWatch{% endblock %}
 
 {% block content %}
 <div class="row mb-3">
@@ -138,21 +138,13 @@
                         <i class="bi bi-bar-chart"></i> Detection Summary
                     </h5>
                     <div class="row mb-4">
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label class="form-label">Rust Detections</label>
                             <input type="text" class="form-control" value="{{ inspection.rust_count }}" readonly>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-6">
                             <label class="form-label">Severity Level</label>
                             <input type="text" class="form-control" value="{{ inspection.severity_level or 'NONE' }}" readonly>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Coverage</label>
-                            <input type="text" class="form-control" value="{{ inspection.coverage_ratio or 0 }}%" readonly>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Patches</label>
-                            <input type="text" class="form-control" value="{{ inspection.patch_count or 0 }}" readonly>
                         </div>
                     </div>
 

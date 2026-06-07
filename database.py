@@ -57,7 +57,7 @@ class Database:
                     inspector_name, weather_condition, temperature,
                     inspection_notes, severity_rating,
                     total_detections, rust_count,
-                    severity_level, coverage_ratio, patch_count, blur_score,
+                    severity_level, blur_score,
                     upload_source, inference_time,
                     original_image_path, result_image_path
                 ) VALUES (
@@ -66,7 +66,7 @@ class Database:
                     %(inspector_name)s, %(weather_condition)s, %(temperature)s,
                     %(inspection_notes)s, %(severity_rating)s,
                     %(total_detections)s, %(rust_count)s,
-                    %(severity_level)s, %(coverage_ratio)s, %(patch_count)s, %(blur_score)s,
+                    %(severity_level)s, %(blur_score)s,
                     %(upload_source)s, %(inference_time)s,
                     %(original_image_path)s, %(result_image_path)s
                 )

@@ -2,7 +2,7 @@
 
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Bridge Defect Detection{% endblock %}
+{% block title %}Dashboard — RustWatch{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -142,12 +142,9 @@
                                     <tr>
                                         <th>Time</th>
                                         <th>Filename</th>
-                                        <th>Model</th>
                                         <th>Rust</th>
                                         <th>Severity</th>
-                                        <th>Coverage</th>
                                         <th>Source</th>
-                                        <th>Inference (ms)</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -166,16 +163,13 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <span class="text-truncate d-inline-block" style="max-width: 150px;" 
+                                            <span class="text-truncate d-inline-block" style="max-width: 150px;"
                                                   title="{{ inspection.filename }}">
                                                 {{ inspection.filename }}
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-secondary">{{ inspection.model }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-danger">{{ inspection.rust_count }}</span>
+                                            <span class="badge bg-secondary">{{ inspection.rust_count }}</span>
                                         </td>
                                         <td>
                                             {% if inspection.severity_level == 'HIGH' %}
@@ -188,7 +182,6 @@
                                                 <span class="badge bg-secondary">NONE</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ inspection.coverage_ratio or 0 }}%</td>
                                         <td>
                                             {% if inspection.upload_source == 'rpi5' %}
                                                 <span class="badge bg-primary">RPi5</span>
@@ -196,7 +189,6 @@
                                                 <span class="badge bg-secondary">Web</span>
                                             {% endif %}
                                         </td>
-                                        <td>{{ inspection.inference_time }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="{{ url_for('inspection_detail', inspection_id=inspection.id) }}" 

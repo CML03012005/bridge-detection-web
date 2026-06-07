@@ -33,8 +33,6 @@ CREATE TABLE inspections (
 
     -- Severity Analysis (from severity.py)
     severity_level ENUM('NONE', 'LOW', 'MEDIUM', 'HIGH') DEFAULT 'NONE',
-    coverage_ratio DECIMAL(5,2) DEFAULT 0,
-    patch_count INT DEFAULT 0,
     blur_score DECIMAL(8,2) DEFAULT NULL,
 
     -- Upload Source
@@ -92,13 +90,13 @@ CREATE TABLE detections (
 INSERT INTO inspections (
     timestamp, filename, model, bridge_name, bridge_location,
     inspector_name, severity_rating, severity_level,
-    total_detections, rust_count, coverage_ratio, patch_count,
+    total_detections, rust_count,
     inference_time, original_image_path, result_image_path, upload_source
 ) VALUES (
     NOW(), 'sample_bridge.jpg', 'YOLOv8n',
     'San Juanico Bridge', 'Leyte-Samar',
     'Test Inspector', 'Fair', 'LOW',
-    2, 2, 4.50, 1,
+    2, 2,
     150.5,
     '/static/uploads/sample.jpg', '/static/results/sample.jpg',
     'web'
