@@ -83,18 +83,15 @@ class Database:
                 cursor.execute(sql, (inspection_id,))
                 return cursor.fetchone()
 
-    def get_all_inspections(self, limit=None, offset=0, source=None):
-        """Get all inspections with optional pagination and source filter"""
+    def get_all_inspections(self, limit=None, offset=0):
+        """Get all inspections with optional pagination"""
         with self.get_connection() as conn:
             with conn.cursor() as cursor:
-                where = "WHERE upload_source = %s" if source else ""
                 if limit:
-                    sql = f"SELECT * FROM inspections {where} ORDER BY created_at DESC LIMIT %s OFFSET %s"
-                    params = ([source] if source else []) + [limit, offset]
+                    sql = "SELECT * FROM inspections ORDER BY created_at DESC LIMIT %s OFFSET %s"
+                    cursor.execute(sql, [limit, offset])
                 else:
-                    sql = f"SELECT * FROM inspections {where} ORDER BY created_at DESC"
-                    params = [source] if source else []
-                cursor.execute(sql, params if params else None)
+                    cursor.execute("SELECT * FROM inspections ORDER BY created_at DESC")
                 return cursor.fetchall()
 
     def update_inspection(self, inspection_id, update_data):
@@ -219,17 +216,11 @@ class Database:
                 cursor.execute(sql, (search_pattern, search_pattern, search_pattern))
                 return cursor.fetchall()
 
-    def get_inspection_count(self, source=None):
-        """Get total number of inspections, optionally filtered by source"""
+    def get_inspection_count(self):
+        """Get total number of inspections"""
         with self.get_connection() as conn:
             with conn.cursor() as cursor:
-                if source:
-                    cursor.execute(
-                        "SELECT COUNT(*) as count FROM inspections WHERE upload_source = %s",
-                        (source,)
-                    )
-                else:
-                    cursor.execute("SELECT COUNT(*) as count FROM inspections")
+                cursor.execute("SELECT COUNT(*) as count FROM inspections")
                 result = cursor.fetchone()
                 return result['count'] if result else 0
 

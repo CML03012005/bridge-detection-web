@@ -144,7 +144,6 @@
                                         <th>Filename</th>
                                         <th>Rust</th>
                                         <th>Severity</th>
-                                        <th>Source</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -180,13 +179,6 @@
                                                 <span class="badge bg-success">LOW</span>
                                             {% else %}
                                                 <span class="badge bg-secondary">NONE</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if inspection.upload_source == 'rpi5' %}
-                                                <span class="badge bg-primary">RPi5</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary">Web</span>
                                             {% endif %}
                                         </td>
                                         <td>

@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 from datetime import datetime
@@ -140,138 +139,30 @@ def dashboard():
         return render_template('dashboard.html', stats=stats, history=[])
 
 
-@app.route('/upload-rpi5', methods=['POST'])
-def upload_rpi5():
-    """
-    Receive a detection result uploaded from the Raspberry Pi 5.
-    Accepts the annotated image + pre-computed metadata (no inference needed).
-
-    Expected form fields:
-        file            — annotated image (required)
-        original_file   — original image before annotation (optional)
-        detections      — JSON string of detection list
-        inference_time  — float (ms)
-        severity_level  — NONE / LOW / MEDIUM / HIGH
-        blur_score      — float (Laplacian variance)
-        model           — model name string (e.g. "YOLOv8n-ONNX")
-    """
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-
-    file = request.files['file']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid or missing file'}), 400
-
-    try:
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        unique_filename = f"rpi5_{timestamp}_{filename}"
-
-        # Save annotated image as the result image
-        result_filename = f"result_{unique_filename}"
-        result_path = os.path.join(app.config['RESULTS_FOLDER'], result_filename)
-        file.save(result_path)
-
-        # Save original image if provided, otherwise reuse the annotated one
-        original_file = request.files.get('original_file')
-        if original_file and original_file.filename:
-            orig_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            original_file.save(orig_path)
-            original_image_path = f"/static/uploads/{unique_filename}"
-        else:
-            shutil.copy(result_path, os.path.join(app.config['UPLOAD_FOLDER'], unique_filename))
-            original_image_path = f"/static/uploads/{unique_filename}"
-
-        # Parse metadata from form
-        detections_raw = request.form.get('detections', '[]')
-        detections = json.loads(detections_raw)
-
-        severity_level  = request.form.get('severity_level', 'NONE')
-        blur_score      = request.form.get('blur_score')
-        blur_score      = float(blur_score) if blur_score else None
-        inference_time  = float(request.form.get('inference_time', 0))
-        model_name      = request.form.get('model', 'YOLOv8n-ONNX')
-        rust_count      = len(detections)
-        dpwh_severity   = SEVERITY_TO_DPWH.get(severity_level, 'Good')
-
-        inspection_data = {
-            'timestamp':            datetime.now(),
-            'filename':             filename,
-            'model':                model_name,
-            'bridge_name':          None,
-            'bridge_location':      None,
-            'bridge_type':          None,
-            'inspector_name':       None,
-            'weather_condition':    None,
-            'temperature':          None,
-            'inspection_notes':     None,
-            'severity_rating':      dpwh_severity,
-            'total_detections':     rust_count,
-            'rust_count':           rust_count,
-            'severity_level':       severity_level,
-            'blur_score':           blur_score,
-            'upload_source':        'rpi5',
-            'inference_time':       inference_time,
-            'original_image_path':  original_image_path,
-            'result_image_path':    f"/static/results/{result_filename}",
-        }
-
-        inspection_id = db.create_inspection(inspection_data)
-
-        for detection in detections:
-            bbox = detection.get('bbox', [0, 0, 0, 0])
-            db.create_detection({
-                'inspection_id': inspection_id,
-                'defect_type':   detection.get('class', 'rust'),
-                'confidence':    detection.get('confidence', 0),
-                'bbox_x1':       bbox[0],
-                'bbox_y1':       bbox[1],
-                'bbox_x2':       bbox[2],
-                'bbox_y2':       bbox[3],
-            })
-
-        return jsonify({
-            'success':       True,
-            'inspection_id': inspection_id,
-            'message':       'RPi5 detection uploaded successfully',
-        })
-
-    except Exception as e:
-        import traceback
-        print("=" * 70)
-        print("ERROR IN /upload-rpi5:")
-        print(traceback.format_exc())
-        print("=" * 70)
-        return jsonify({'error': str(e)}), 500
-
-
 # ==========================================
 # CRUD ROUTES - INSPECTIONS
 # ==========================================
 
 @app.route('/inspections')
 def inspections_list():
-    """List all inspections, with optional source filter (?source=rpi5|web)"""
+    """List all inspections with pagination"""
     try:
         page = request.args.get('page', 1, type=int)
-        source = request.args.get('source', None)  # 'rpi5', 'web', or None = all
         per_page = 20
         offset = (page - 1) * per_page
 
-        inspections = db.get_all_inspections(limit=per_page, offset=offset, source=source)
-        total = db.get_inspection_count(source=source)
+        inspections = db.get_all_inspections(limit=per_page, offset=offset)
+        total = db.get_inspection_count()
         total_pages = (total + per_page - 1) // per_page
 
         return render_template('inspections_list.html',
                                inspections=inspections,
                                page=page,
                                total_pages=total_pages,
-                               total=total,
-                               active_source=source or 'all')
+                               total=total)
     except Exception as e:
         flash(f'Error loading inspections: {str(e)}', 'danger')
-        return render_template('inspections_list.html', inspections=[], page=1, total_pages=1, total=0,
-                               active_source='all')
+        return render_template('inspections_list.html', inspections=[], page=1, total_pages=1, total=0)
 
 
 @app.route('/inspection/<int:inspection_id>')
@@ -558,7 +449,6 @@ if __name__ == '__main__':
     print(f"🔗 Open your browser to: http://127.0.0.1:5000")
     print(f"📊 Dashboard: http://127.0.0.1:5000/dashboard")
     print(f"📋 Inspections: http://127.0.0.1:5000/inspections")
-    print(f"📡 RPi5 Upload endpoint: POST http://127.0.0.1:5000/upload-rpi5")
     print("=" * 70 + "\n")
 
     app.run(debug=True, host='0.0.0.0', port=5000)
