@@ -3,3 +3,7 @@
 
 # Models
 models/ver/
+
+# Python bytecode
+__pycache__/
+*.pyc

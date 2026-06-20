@@ -3,144 +3,254 @@
 {% block title %}New Inspection — RustWatch{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
+<div class="mx-auto" style="max-width:1100px;">
 
-        <div class="mb-4">
-            <h1 class="mb-0"><i class="bi bi-plus-circle"></i> New Inspection</h1>
-            <small class="text-muted">Upload an image &mdash; review the result before saving</small>
-        </div>
+    <!-- Header (tight) -->
+    <div class="mb-3 mt-1">
+        <h1 class="h3 mb-0"><i class="bi bi-plus-circle"></i> New Inspection</h1>
+        <small class="text-muted">Upload an image or use the live camera &mdash; review the result before saving</small>
+    </div>
 
-        <!-- Upload Section -->
-        <div id="uploadSection">
-            <div class="col-md-10 col-xl-7 mx-auto px-0">
-                <div class="card shadow-sm">
-                    <div class="card-body p-4">
-                        <div class="upload-area" id="uploadArea">
-                            <i class="bi bi-cloud-arrow-up upload-icon"></i>
-                            <p class="mb-2">Drag &amp; drop image here or click to browse</p>
+    <!-- ===================== INPUT STAGE ===================== -->
+    <div id="uploadSection">
+        <div class="row g-3">
+
+            <!-- Left: Upload -->
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white py-2">
+                        <span class="small fw-bold"><i class="bi bi-cloud-arrow-up"></i> Upload Image</span>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="upload-area flex-grow-1 d-flex flex-column justify-content-center"
+                             id="uploadArea" style="padding:24px 16px; min-height:288px;">
+                            <i class="bi bi-cloud-arrow-up upload-icon" style="font-size:2.6rem; margin-bottom:8px;"></i>
+                            <p class="mb-1">Drag &amp; drop or click to browse</p>
                             <p class="text-muted small mb-0">JPG, JPEG, PNG &mdash; Max 16MB</p>
                             <input type="file" id="fileInput" accept="image/*" hidden>
                         </div>
-                        <div class="progress mt-3" id="progressBar" style="display:none;">
+                        <p class="text-muted small mb-0 mt-2">
+                            <i class="bi bi-info-circle text-primary"></i>
+                            Best results: close-ups of bearings, gusset plates, cover-plate terminations, or stiffeners.
+                        </p>
+                        <div class="progress mt-2" id="progressBar" style="display:none;">
                             <div class="progress-bar progress-bar-striped progress-bar-animated"
                                  role="progressbar" style="width:100%">Running detection...</div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="alert alert-light border mt-3 py-2 px-3 small d-flex align-items-center mb-0">
-                    <i class="bi bi-info-circle text-primary me-2"></i>
-                    <span>
-                        <strong>For best results:</strong> capture close-up shots of structural components &mdash;
-                        bearings, gusset plate connections, cover plate terminations, or out-of-plane stiffeners.
-                    </span>
+            <!-- Right: Live Camera -->
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+                        <span class="small fw-bold"><i class="bi bi-camera-video"></i> Live Camera (RPi5)</span>
+                        {% if pi_stream_url %}
+                        <span class="badge bg-light text-muted border" id="liveCamStatus">Off</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-0 bg-dark d-flex flex-column justify-content-center align-items-center position-relative"
+                         style="min-height:288px;">
+                        {% if pi_stream_url %}
+                        <img id="liveCamFeed" alt="RPi5 live camera"
+                             style="max-width:100%; max-height:320px; height:auto; display:none;">
+
+                        <div id="liveCamPlaceholder" class="text-center text-light px-3">
+                            <i class="bi bi-camera-video-off" style="font-size:2.2rem;"></i>
+                            <div class="small mt-2 mb-3">Live view from the Pi camera</div>
+                            <button type="button" class="btn btn-primary btn-sm" id="liveCamToggle">
+                                <i class="bi bi-broadcast"></i> Start Live View
+                            </button>
+                        </div>
+
+                        <div id="liveCamError" class="text-light small text-center px-3" style="display:none;">
+                            <i class="bi bi-exclamation-triangle text-warning" style="font-size:1.6rem;"></i>
+                            <div class="mt-2">Can't reach the camera. Is <code>detect_lcd.py</code> running on the Pi,
+                                on the same network?</div>
+                            <button type="button" class="btn btn-outline-light btn-sm mt-2" id="liveCamRetry">
+                                <i class="bi bi-arrow-clockwise"></i> Retry
+                            </button>
+                        </div>
+
+                        <button type="button" class="btn btn-light btn-sm position-absolute" id="liveCamStop"
+                                style="top:8px; right:8px; display:none;">
+                            <i class="bi bi-stop-fill"></i> Stop
+                        </button>
+                        {% else %}
+                        <div class="text-center text-light small px-3">
+                            <i class="bi bi-camera-video-off" style="font-size:2.2rem;"></i>
+                            <div class="mt-2">Live camera not configured.<br>
+                                Set <code>PI_STREAM_URL</code> in <code>config.py</code>.</div>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Detection Section (shown after upload) -->
-        <div id="detectionSection" style="display:none;">
-            <div class="row g-3">
-
-                <!-- Left: Image with canvas overlay -->
-                <div class="col-lg-8" style="display:flex; flex-direction:column;">
-                    <div class="card shadow-sm">
-                        <div class="card-body p-0">
-                            <div id="imageContainer" style="position:relative; height:460px;">
-                                <img id="testImage"
-                                     style="display:block; width:100%; height:100%; object-fit:contain;"
-                                     alt="Inspection Image">
-                                <canvas id="detectionCanvas"
-                                        style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
-                                <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); white-space:nowrap;">
-                                    <span id="detectionBadge" class="badge bg-dark px-3 py-2"
-                                          style="font-size:0.9rem;">0 objects detected</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-2 d-flex gap-2 align-items-center flex-wrap">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="resetUpload()">
-                            <i class="bi bi-arrow-clockwise"></i> Scan Another
-                        </button>
-                        <button id="saveBtn" class="btn btn-primary btn-sm" onclick="saveToInspections()" style="display:none;">
-                            <i class="bi bi-floppy"></i> Save Inspection
-                        </button>
-                        <a id="inspectionLink" href="#" class="btn btn-outline-success btn-sm" style="display:none;">
-                            <i class="bi bi-check-circle"></i> Saved — View Inspection
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Right: Controls -->
-                <div class="col-lg-4" id="rightCol">
-                    <!-- Detection Result Card -->
-                    <div class="card shadow-sm mb-3">
-                        <div class="card-header bg-white py-2">
-                            <span class="small fw-bold"><i class="bi bi-bar-chart"></i> Detection Result</span>
-                        </div>
-                        <div class="card-body py-2">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="text-muted small">Severity</span>
-                                <span id="savedSeverity" class="badge bg-secondary">—</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-muted small">Inference Time</span>
-                                <span id="inferenceDisplay" class="small fw-bold">—</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Advanced toggle -->
-                    <button class="btn btn-sm btn-outline-secondary w-100 mb-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#advancedPanel"
-                            aria-expanded="false" aria-controls="advancedPanel">
-                        <i class="bi bi-sliders"></i> Advanced
-                    </button>
-
-                    <!-- Advanced collapse (sliders) -->
-                    <div class="collapse" id="advancedPanel">
-                        <div class="card shadow-sm mb-3">
-                            <div class="card-header bg-white py-2">
-                                <span class="small fw-bold"><i class="bi bi-sliders"></i> Visual Explorer</span>
-                                <span class="text-muted ms-1" style="font-size:0.7rem;">(visual only)</span>
-                            </div>
-                            <div class="card-body">
-
-                                <!-- Confidence Threshold -->
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="form-label mb-0 small fw-semibold">Confidence Threshold:</label>
-                                        <span id="confDisplay" class="fw-bold text-primary small">50%</span>
-                                    </div>
-                                    <input type="range" class="form-range" id="confSlider" min="1" max="99" value="50">
-                                    <div class="d-flex justify-content-between text-muted" style="font-size:0.72rem;">
-                                        <span>0%</span><span>100%</span>
-                                    </div>
-                                </div>
-
-                                <!-- Overlap Threshold -->
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="form-label mb-0 small fw-semibold">Overlap Threshold:</label>
-                                        <span id="iouDisplay" class="fw-bold text-primary small">50%</span>
-                                    </div>
-                                    <input type="range" class="form-range" id="iouSlider" min="1" max="99" value="50">
-                                    <div class="d-flex justify-content-between text-muted" style="font-size:0.72rem;">
-                                        <span>0%</span><span>100%</span>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
         </div>
     </div>
+
+    {% if pi_stream_url %}
+    <script>
+    (function () {
+        var toggle = document.getElementById('liveCamToggle');
+        if (!toggle) return;
+        var feed        = document.getElementById('liveCamFeed');
+        var placeholder = document.getElementById('liveCamPlaceholder');
+        var err         = document.getElementById('liveCamError');
+        var stopBtn     = document.getElementById('liveCamStop');
+        var retry       = document.getElementById('liveCamRetry');
+        var status      = document.getElementById('liveCamStatus');
+        var streamUrl   = {{ pi_stream_url | tojson }};
+
+        function setStatus(text, cls) {
+            if (status) { status.textContent = text; status.className = 'badge ' + cls; }
+        }
+        function start() {
+            placeholder.style.display = 'none';
+            err.style.display = 'none';
+            feed.style.display = 'block';
+            stopBtn.style.display = 'inline-block';
+            setStatus('Live', 'bg-danger');
+            // cache-bust so re-opening always reconnects a fresh stream
+            feed.src = streamUrl + (streamUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+        }
+        function stop() {
+            feed.removeAttribute('src');   // stop pulling the MJPEG stream
+            feed.style.display = 'none';
+            stopBtn.style.display = 'none';
+            err.style.display = 'none';
+            placeholder.style.display = 'block';
+            setStatus('Off', 'bg-light text-muted border');
+        }
+        toggle.addEventListener('click', start);
+        if (retry) retry.addEventListener('click', start);
+        stopBtn.addEventListener('click', stop);
+        feed.addEventListener('error', function () {
+            feed.style.display = 'none';
+            stopBtn.style.display = 'none';
+            err.style.display = 'block';
+            setStatus('Error', 'bg-warning text-dark');
+        });
+    })();
+    </script>
+    {% endif %}
+
+    <!-- ===================== REVIEW STAGE ===================== -->
+    <div id="detectionSection" style="display:none;">
+        <div class="row g-3">
+
+            <!-- Left: Image with canvas overlay -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm">
+                    <div class="card-body p-0">
+                        <div id="imageContainer" style="position:relative; height:440px;">
+                            <img id="testImage"
+                                 style="display:block; width:100%; height:100%; object-fit:contain;"
+                                 alt="Inspection Image">
+                            <canvas id="detectionCanvas"
+                                    style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+                            <div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); white-space:nowrap;">
+                                <span id="detectionBadge" class="badge bg-dark px-3 py-2"
+                                      style="font-size:0.9rem;">0 objects detected</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Results panel -->
+            <div class="col-lg-5" id="rightCol">
+
+                <!-- Summary -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-white py-2">
+                        <span class="small fw-bold"><i class="bi bi-bar-chart"></i> Detection Result</span>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Severity</span>
+                            <span id="savedSeverity" class="badge bg-secondary">&mdash;</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Inference Time</span>
+                            <span id="inferenceDisplay" class="small fw-bold">&mdash;</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detected regions -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-white py-2">
+                        <span class="small fw-bold"><i class="bi bi-list-check"></i> Detected Regions</span>
+                    </div>
+                    <div class="card-body py-2" id="detectionsList" style="max-height:190px; overflow:auto;">
+                        <div class="text-muted small">&mdash;</div>
+                    </div>
+                </div>
+
+                <!-- Advanced toggle -->
+                <button class="btn btn-sm btn-outline-secondary w-100 mb-2"
+                        type="button" data-bs-toggle="collapse" data-bs-target="#advancedPanel"
+                        aria-expanded="false" aria-controls="advancedPanel">
+                    <i class="bi bi-sliders"></i> Advanced
+                </button>
+
+                <!-- Advanced collapse (sliders) -->
+                <div class="collapse" id="advancedPanel">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header bg-white py-2">
+                            <span class="small fw-bold"><i class="bi bi-sliders"></i> Visual Explorer</span>
+                            <span class="text-muted ms-1" style="font-size:0.7rem;">(visual only)</span>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Confidence Threshold -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0 small fw-semibold">Confidence Threshold:</label>
+                                    <span id="confDisplay" class="fw-bold text-primary small">50%</span>
+                                </div>
+                                <input type="range" class="form-range" id="confSlider" min="1" max="99" value="50">
+                                <div class="d-flex justify-content-between text-muted" style="font-size:0.72rem;">
+                                    <span>0%</span><span>100%</span>
+                                </div>
+                            </div>
+
+                            <!-- Overlap Threshold -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label mb-0 small fw-semibold">Overlap Threshold:</label>
+                                    <span id="iouDisplay" class="fw-bold text-primary small">50%</span>
+                                </div>
+                                <input type="range" class="form-range" id="iouSlider" min="1" max="99" value="50">
+                                <div class="d-flex justify-content-between text-muted" style="font-size:0.72rem;">
+                                    <span>0%</span><span>100%</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Bottom action bar -->
+        <div class="d-flex gap-2 align-items-center justify-content-end mt-3 pt-3 border-top flex-wrap">
+            <button class="btn btn-outline-secondary" onclick="resetUpload()">
+                <i class="bi bi-arrow-counterclockwise"></i> Discard / Re-upload
+            </button>
+            <button id="saveBtn" class="btn btn-primary" onclick="saveToInspections()" style="display:none;">
+                <i class="bi bi-floppy"></i> Save Inspection
+            </button>
+            <a id="inspectionLink" href="#" class="btn btn-outline-success" style="display:none;">
+                <i class="bi bi-check-circle"></i> Saved &mdash; View Inspection
+            </a>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -212,7 +322,7 @@
                 showSavedSeverity(data.severity_level);
 
                 // Show Save Inspection button
-                document.getElementById('saveBtn').style.display = 'inline';
+                document.getElementById('saveBtn').style.display = 'inline-block';
 
                 // Set slider to server's confidence threshold (so initial view matches result)
                 const confPct = Math.round(data.conf_threshold * 100);
@@ -251,7 +361,7 @@
             btn.style.display = 'none';
             const link = document.getElementById('inspectionLink');
             link.href = '/inspection/' + data.inspection_id;
-            link.style.display = 'inline';
+            link.style.display = 'inline-block';
             pendingSave = null;
         })
         .catch(err => {
@@ -272,6 +382,27 @@
         };
         badge.className = 'badge ' + (sevColors[level] || 'bg-secondary');
         badge.textContent = level || 'NONE';
+    }
+
+    // ── Detected regions list ─────────────────────────────────────────────
+    function renderDetectionsList(dets) {
+        const el = document.getElementById('detectionsList');
+        if (!el) return;
+        if (!dets.length) {
+            el.innerHTML = '<div class="text-muted small">No corrosion detected at this threshold.</div>';
+            return;
+        }
+        const sevColor = { 'high': 'text-danger', 'medium': 'text-warning', 'low': 'text-success' };
+        el.innerHTML = dets.map((d, i) => {
+            const cls   = (d.class || '').toLowerCase();
+            const color = sevColor[cls] || 'text-dark';
+            return '<div class="d-flex justify-content-between align-items-center py-1 ' +
+                   (i < dets.length - 1 ? 'border-bottom' : '') + '">' +
+                       '<span class="small"><span class="text-muted">#' + (i + 1) + '</span> ' +
+                       '<span class="fw-semibold ' + color + '">' + (d.class || '').toUpperCase() + '</span></span>' +
+                       '<span class="small fw-bold">' + (d.confidence * 100).toFixed(0) + '%</span>' +
+                   '</div>';
+        }).join('');
     }
 
     // ── Sliders ────────────────────────────────────────────────────────────
@@ -295,6 +426,7 @@
         const filtered     = applyNMS(confFiltered, iouThreshold);
 
         drawBoxes(filtered);
+        renderDetectionsList(filtered);
 
         const count = filtered.length;
         document.getElementById('detectionBadge').textContent =
@@ -397,6 +529,7 @@
         document.getElementById('saveBtn').disabled               = false;
         document.getElementById('saveBtn').innerHTML              = '<i class="bi bi-floppy"></i> Save Inspection';
         document.getElementById('inspectionLink').style.display   = 'none';
+        document.getElementById('detectionsList').innerHTML       = '<div class="text-muted small">&mdash;</div>';
         fileInput.value = '';
         confSlider.value = 50; iouSlider.value = 50;
         document.getElementById('confDisplay').textContent = '50%';
