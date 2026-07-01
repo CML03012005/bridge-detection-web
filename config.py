@@ -25,6 +25,6 @@ CONFIDENCE_THRESHOLD = 0.05
 IOU_THRESHOLD = 0.45
 
 # RPi5 live camera stream (MJPEG served by detect_lcd.py on the Pi).
-# Set this to the Pi's LAN address + port, e.g. "http://192.168.1.42:8000/video_feed".
-# Find the Pi's IP with `hostname -I` on the Pi. Leave blank to hide the Live Camera button.
-PI_STREAM_URL = 'http://10.194.230.154:8000/video_feed'
+# Uses the Pi's Tailscale IP (eaglekim) so it works on any network without changing.
+# Get it with `tailscale ip -4` on the Pi. Leave blank to hide the Live Camera button.
+PI_STREAM_URL = 'http://100.102.61.125:8000/video_feed'
